@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2b1d12">
+<title>我们的客厅</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%232b1d12'/><path d='M10 16h12M16 10v12' stroke='%23d8a657' stroke-width='3'/></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- ===== 登录/进入 ===== -->
+<div id="lobby" class="lobby">
+  <div class="lobby-card">
+    <div class="brand">
+      <div class="brand-monogram" aria-label="YBB">
+        <span class="m-letter">Y</span><span class="m-amp">·</span>
+        <span class="m-letter">B</span><span class="m-amp">·</span>
+        <span class="m-letter">B</span>
+      </div>
+      <h1>我们的客厅</h1>
+      <p class="sub">两个人的聊天室 · 语音 · 文字 · 照片</p>
+    </div>
+    <label class="field">
+      <span>你的名字</span>
+      <input id="nameInput" maxlength="16" placeholder="输入你的名字" autocomplete="off">
+    </label>
+    <label class="field">
+      <span>房间名</span>
+      <input id="roomInput" maxlength="32" placeholder="两人约定同一个房间名" autocomplete="off">
+    </label>
+    <button id="enterBtn" class="btn-primary">进入客厅</button>
+    <p class="hint">告诉对方同一个房间名，你们就能在这里聊天了。</p>
+  </div>
+</div>
+
+<!-- ===== 聊天主界面 ===== -->
+<div id="app" class="app hidden">
+  <header class="topbar">
+    <div class="back" id="backBtn">‹</div>
+    <div class="peer">
+      <div class="peer-avatar" id="peerAvatar">?</div>
+      <div class="peer-info">
+        <div class="peer-name" id="peerName">对方</div>
+        <div class="peer-status" id="peerStatus">连接中…</div>
+      </div>
+    </div>
+    <button id="callBtn" class="call-btn" title="语音通话">📞</button>
+  </header>
+
+  <div id="msgList" class="msg-list">
+    <div class="day-divider">开始聊天吧</div>
+  </div>
+
+  <footer class="inputbar">
+    <button id="micBtn" class="input-btn" title="按住说话">🎤</button>
+    <button id="imgBtn" class="input-btn" title="发送照片">📷</button>
+    <button id="fileBtn" class="input-btn" title="发送文件">📎</button>
+    <button id="emojiBtn" class="input-btn" title="表情">😊</button>
+    <input id="textInput" class="text-input" type="text" placeholder="输入消息…" autocomplete="off">
+    <button id="sendBtn" class="send-btn hidden">发送</button>
+
+    <!-- 按住说话覆盖层 -->
+    <div id="recordingOverlay" class="recording hidden">
+      <div class="rec-order">松开发送 · 上滑取消</div>
+      <div class="rec-timer" id="recTimer">0:00</div>
+    </div>
+  </footer>
+  <input type="file" id="filePicker" class="hidden" accept="*">
+  <input type="file" id="imgPicker" class="hidden" accept="image/*">
+</div>
+
+<!-- ===== 通话覆盖层 ===== -->
+<div id="callOverlay" class="call-overlay hidden">
+  <div class="call-card">
+    <div class="call-avatar" id="callAvatar">?</div>
+    <div class="call-title" id="callTitle">语音通话</div>
+    <div class="call-status" id="callStatus">呼叫中…</div>
+    <div class="call-actions">
+      <button id="callReject" class="call-reject hidden">拒绝</button>
+      <button id="callAccept" class="call-accept hidden">接听</button>
+      <button id="callHangup" class="call-hangup hidden">挂断</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>

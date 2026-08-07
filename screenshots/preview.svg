@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f2116"/>
+      <stop offset="1" stop-color="#150e08"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8be7a"/>
+      <stop offset="1" stop-color="#a06e2e"/>
+    </linearGradient>
+    <linearGradient id="mine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8be7a"/>
+      <stop offset="1" stop-color="#a06e2e"/>
+    </linearGradient>
+    <linearGradient id="peer" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a2a1c"/>
+      <stop offset="1" stop-color="#241812"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+
+  <!-- 标题 -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif" text-anchor="middle">
+    <text x="540" y="100" font-size="60" font-weight="700" fill="#f3dca6" letter-spacing="8">☕ 我们的客厅</text>
+    <text x="540" y="160" font-size="22" fill="#b3a28c" letter-spacing="3">两个人的微信风格聊天室 · 自部署 · 开源</text>
+  </g>
+
+  <!-- 手机外框 -->
+  <g transform="translate(290, 230)">
+    <rect x="0" y="0" width="500" height="780" rx="40" fill="#1b120b" stroke="#3a2a1c" stroke-width="2"/>
+
+    <!-- 顶栏 -->
+    <rect x="0" y="0" width="500" height="80" fill="#241812"/>
+    <circle cx="60" cy="40" r="28" fill="url(#gold)"/>
+    <text x="60" y="50" font-family="sans-serif" font-size="22" font-weight="700" fill="#f3dca6" text-anchor="middle">宝</text>
+    <text x="110" y="35" font-family="sans-serif" font-size="18" font-weight="600" fill="#f4ece0">宝贝</text>
+    <text x="110" y="55" font-family="sans-serif" font-size="13" fill="#7fb069">● 在线</text>
+    <circle cx="450" cy="40" r="20" fill="url(#gold)"/>
+    <text x="450" y="48" font-family="sans-serif" font-size="20" text-anchor="middle">📞</text>
+
+    <!-- 消息区 -->
+    <text x="250" y="120" font-family="sans-serif" font-size="11" fill="#8b7a68" text-anchor="middle">— 今天 19:35 —</text>
+
+    <!-- 对话气泡 1: 对方文字 -->
+    <circle cx="50" cy="170" r="18" fill="url(#gold)"/>
+    <text x="50" y="178" font-family="sans-serif" font-size="14" font-weight="700" fill="#f3dca6" text-anchor="middle">宝</text>
+    <text x="80" y="160" font-family="sans-serif" font-size="10" fill="#8b7a68">宝贝 19:35</text>
+    <rect x="80" y="170" width="240" height="50" rx="14" fill="url(#peer)"/>
+    <text x="100" y="200" font-family="sans-serif" font-size="17" fill="#f4ece0">在干嘛呀 ❤️</text>
+
+    <!-- 对话气泡 2: 对方语音条 -->
+    <circle cx="50" cy="260" r="18" fill="url(#gold)"/>
+    <text x="50" y="268" font-family="sans-serif" font-size="14" font-weight="700" fill="#f3dca6" text-anchor="middle">宝</text>
+    <text x="80" y="250" font-family="sans-serif" font-size="10" fill="#8b7a68">宝贝 19:36</text>
+    <rect x="80" y="260" width="180" height="42" rx="14" fill="url(#peer)"/>
+    <text x="100" y="285" font-family="sans-serif" font-size="13" fill="#f4ece0">▶</text>
+    <g fill="#f4ece0">
+      <rect x="120" y="285" width="3" height="10" rx="1"/>
+      <rect x="126" y="282" width="3" height="14" rx="1"/>
+      <rect x="132" y="285" width="3" height="10" rx="1"/>
+      <rect x="138" y="278" width="3" height="18" rx="1"/>
+      <rect x="144" y="282" width="3" height="14" rx="1"/>
+      <rect x="150" y="285" width="3" height="10" rx="1"/>
+      <rect x="156" y="282" width="3" height="14" rx="1"/>
+      <rect x="162" y="280" width="3" height="16" rx="1"/>
+      <rect x="168" y="285" width="3" height="10" rx="1"/>
+      <rect x="174" y="282" width="3" height="14" rx="1"/>
+      <rect x="180" y="285" width="3" height="10" rx="1"/>
+    </g>
+    <text x="220" y="285" font-family="sans-serif" font-size="11" fill="#b3a28c">4"</text>
+
+    <!-- 对话气泡 3: 我方图片 -->
+    <text x="450" y="345" font-family="sans-serif" font-size="10" fill="#8b7a68" text-anchor="end">我 19:37</text>
+    <rect x="290" y="355" width="180" height="150" rx="14" fill="url(#mine)"/>
+    <rect x="298" y="362" width="164" height="135" rx="10" fill="#d4a574"/>
+    <circle cx="380" cy="430" r="32" fill="#f3dca6"/>
+    <text x="380" y="438" font-family="sans-serif" font-size="24" font-weight="700" fill="#a06e2e" text-anchor="middle">♥</text>
+
+    <!-- 对话气泡 4: 我方文字 -->
+    <text x="450" y="535" font-family="sans-serif" font-size="10" fill="#8b7a68" text-anchor="end">我 19:37</text>
+    <rect x="330" y="545" width="140" height="40" rx="14" fill="url(#mine)"/>
+    <text x="400" y="570" font-family="sans-serif" font-size="16" fill="#2b1d12" text-anchor="middle">想你啦 🥰</text>
+
+    <!-- 输入区 -->
+    <rect x="0" y="700" width="500" height="80" fill="#241812"/>
+    <rect x="0" y="700" width="500" height="1" fill="rgba(216,166,87,.2)"/>
+    <circle cx="35" cy="740" r="17" fill="rgba(255,255,255,.06)" stroke="rgba(216,166,87,.15)"/>
+    <text x="35" y="747" font-family="sans-serif" font-size="14" text-anchor="middle">🎤</text>
+    <circle cx="75" cy="740" r="17" fill="rgba(255,255,255,.06)" stroke="rgba(216,166,87,.15)"/>
+    <text x="75" y="747" font-family="sans-serif" font-size="14" text-anchor="middle">📷</text>
+    <circle cx="115" cy="740" r="17" fill="rgba(255,255,255,.06)" stroke="rgba(216,166,87,.15)"/>
+    <text x="115" y="747" font-family="sans-serif" font-size="14" text-anchor="middle">📎</text>
+    <circle cx="155" cy="740" r="17" fill="rgba(255,255,255,.06)" stroke="rgba(216,166,87,.15)"/>
+    <text x="155" y="747" font-family="sans-serif" font-size="14" text-anchor="middle">😊</text>
+    <rect x="195" y="725" width="270" height="32" rx="16" fill="rgba(20,13,8,.55)" stroke="rgba(216,166,87,.2)"/>
+    <text x="330" y="745" font-family="sans-serif" font-size="14" fill="#8b7a68" text-anchor="middle">输入消息…</text>
+  </g>
+
+  <!-- 底部标签 -->
+  <g font-family="-apple-system, BlinkMacSystemFont, sans-serif" text-anchor="middle">
+    <text x="540" y="1050" font-size="20" font-weight="600" fill="#d8a657">🎤 语音条 · 📞 语音通话 · 📷 图片 · 📎 文件</text>
+    <text x="540" y="1075" font-size="13" fill="#8b7a68">github.com/BaylenJack/lovechat</text>
+  </g>
+</svg>

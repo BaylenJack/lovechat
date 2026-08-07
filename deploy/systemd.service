@@ -1,0 +1,14 @@
+[Unit]
+Description=LoveChat server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/lovechat
+ExecStart=/usr/bin/env node src/server.js
+Restart=always
+RestartSec=3
+Environment=PORT=8080
+
+[Install]
+WantedBy=multi-user.target

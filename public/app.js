@@ -1,0 +1,687 @@
+/* 我们的客厅 — 前端逻辑
+ * 消息收发 / 语音条 / 图片文件 / WebRTC 语音通话
+ */
+'use strict';
+
+const $ = (id) => document.getElementById(id);
+
+// ---------- 身份 ----------
+function getToken() {
+  let t = localStorage.getItem('lovechat.token');
+  if (!t || !/^[A-Za-z0-9_-]{8,64}$/.test(t)) {
+    const buf = new Uint8Array(16);
+    crypto.getRandomValues(buf);
+    t = Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+    localStorage.setItem('lovechat.token', t);
+  }
+  return t;
+}
+const TOKEN = getToken();
+
+// ---------- 状态 ----------
+let ws = null;
+let myName = '';
+let roomId = '';
+let peerName = '对方';
+let online = [];
+let reconnectAttempt = 0;
+let reconnectTimer = null;
+let manualClose = false;
+
+// 通话状态
+let callState = 'idle'; // idle | calling | ringing | talking
+let pc = null;
+let localStream = null;
+let callStartTime = 0;
+let callTimerRaf = null;
+let pendingOffer = null;
+let pendingIce = []; // 远端描述设置前暂存 ICE 候选
+
+// 录音状态
+let mediaRecorder = null;
+let recChunks = [];
+let recStart = 0;
+let recTimerRaf = null;
+let recStream = null;
+
+// ================= 提示 =================
+let toastTimer = null;
+function toast(msg, ms = 2000) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ================= WebSocket =================
+function wsURL() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${location.host}`;
+}
+
+function connect() {
+  clearTimeout(reconnectTimer);
+  manualClose = false;
+  setStatus('连接中…');
+
+  try { ws = new WebSocket(wsURL()); }
+  catch { return scheduleReconnect(); }
+
+  ws.onopen = () => {
+    reconnectAttempt = 0;
+    ws.send(JSON.stringify({ type: 'join', roomId, token: TOKEN, name: myName }));
+  };
+
+  ws.onmessage = (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    handle(m);
+  };
+
+  ws.onclose = () => {
+    if (manualClose) return;
+    setStatus('连接断开，重连中…');
+    scheduleReconnect();
+  };
+  ws.onerror = () => {};
+}
+
+function scheduleReconnect() {
+  reconnectAttempt++;
+  const delay = Math.min(600 * Math.pow(1.6, reconnectAttempt - 1), 8000);
+  clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(connect, delay);
+}
+
+function send(obj) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return toast('还没连上');
+  try { ws.send(JSON.stringify(obj)); } catch { toast('发送失败'); }
+}
+
+function setStatus(text) {
+  $('peerStatus').textContent = text;
+  $('peerStatus').classList.toggle('online', text.includes('在线'));
+}
+
+// ================= 消息处理 =================
+function handle(m) {
+  switch (m.type) {
+    case 'joined':
+      appendHistory(m.history || []);
+      if (m.name) peerName = m.name;
+      $('peerName').textContent = peerName;
+      setStatus('在线');
+      break;
+
+    case 'message':
+      renderMessage(m.message);
+      scrollToBottom();
+      break;
+
+    case 'presence': {
+      const hadOnline = online.length > 0;
+      online = m.online || [];
+      const meOnline = online.includes(myName);
+      setStatus(meOnline && online.length >= 2 ? '在线' : '离线');
+      if (hadOnline && online.length < 2) toast('对方已离线');
+      break;
+    }
+
+    case 'typing':
+      if (m.from !== myName) { setStatus(`${m.from} 正在输入…`); setTimeout(() => setStatus('在线'), 1500); }
+      break;
+
+    case 'signal':
+      handleSignal(m.from, m.signal);
+      break;
+
+    case 'call':
+      handleCall(m.from, m.action);
+      break;
+
+    case 'error':
+      toast(m.error || '出错了');
+      break;
+  }
+}
+
+// ================= 渲染 =================
+function scrollToBottom() {
+  const list = $('msgList');
+  list.scrollTop = list.scrollHeight;
+}
+
+function fmtTime(ts) {
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function appendHistory(msgs) {
+  for (const m of msgs) renderMessage(m, true);
+  scrollToBottom();
+}
+
+function avatarOf(name) {
+  return (name || '?').charAt(0).toUpperCase();
+}
+
+function renderMessage(m, isHistory = false) {
+  const mine = m.from === myName;
+  const list = $('msgList');
+  const row = document.createElement('div');
+  row.className = 'msg ' + (mine ? 'mine' : 'peer');
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.textContent = avatarOf(m.from);
+  row.appendChild(avatar);
+
+  const body = document.createElement('div');
+  body.className = 'body';
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = fmtTime(m.at);
+  body.appendChild(meta);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  if (m.kind === 'text') {
+    bubble.textContent = m.text;
+  } else if (m.kind === 'image') {
+    bubble.classList.add('image');
+    const img = document.createElement('img');
+    img.src = m.url || ('data:' + (m.mime || 'image/png') + ';base64,' + (m.data || ''));
+    img.alt = m.name || '图片';
+    img.loading = 'lazy';
+    img.onclick = () => showImagePreview(img.src);
+    bubble.appendChild(img);
+  } else if (m.kind === 'voice') {
+    bubble.classList.add('voice-msg');
+    const dur = m.duration || 0;
+    bubble.innerHTML = `
+      <span class="v-icon">▶</span>
+      <span class="v-bar">${'<i></i>'.repeat(Math.max(4, Math.min(16, Math.ceil(dur / 2))))}</span>
+      <span class="v-dur">${dur}"</span>`;
+    bubble.onclick = () => playVoice(m.data, m.mime);
+  } else if (m.kind === 'file') {
+    bubble.classList.add('file');
+    bubble.innerHTML = `<span class="f-icon">📄</span><span class="f-name"></span>`;
+    bubble.querySelector('.f-name').textContent = m.name || '文件';
+    bubble.onclick = () => {
+      if (m.url) { window.open(m.url, '_blank'); return; }
+      const a = document.createElement('a');
+      a.href = 'data:' + (m.mime || 'application/octet-stream') + ';base64,' + m.data;
+      a.download = m.name || 'file';
+      a.click();
+    };
+  }
+
+  body.appendChild(bubble);
+  row.appendChild(body);
+  list.appendChild(row);
+}
+
+function showImagePreview(src) {
+  const overlay = document.createElement('div');
+  overlay.className = 'img-preview';
+  const img = document.createElement('img');
+  img.src = src;
+  overlay.appendChild(img);
+  overlay.onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
+}
+
+// ================= 语音条播放 =================
+let audioEl = null;
+function playVoice(b64, mime) {
+  if (audioEl) audioEl.pause();
+  audioEl = new Audio('data:' + (mime || 'audio/webm') + ';base64,' + b64);
+  audioEl.play();
+}
+
+// ================= 录音 =================
+let isRecording = false;
+function startRecording() {
+  if (isRecording) return;
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then((stream) => {
+      isRecording = true;
+      recStream = stream;
+      recChunks = [];
+      recStart = Date.now();
+      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+      mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        isRecording = false;
+      };
+      mediaRecorder.start();
+      $('recordingOverlay').classList.remove('hidden');
+      $('recTimer').textContent = '0:00';
+      recTimerRaf = requestAnimationFrame(tickRecTimer);
+    })
+    .catch(() => toast('无法访问麦克风'));
+}
+
+function tickRecTimer() {
+  if (!isRecording) return;
+  const sec = Math.floor((Date.now() - recStart) / 1000);
+  $('recTimer').textContent = `0:${String(sec).padStart(2, '0')}`;
+  if (sec >= 60) { stopRecording(true); return; }
+  recTimerRaf = requestAnimationFrame(tickRecTimer);
+}
+
+function stopRecording(sendIt = true) {
+  if (!isRecording) return;
+  cancelAnimationFrame(recTimerRaf);
+  $('recordingOverlay').classList.add('hidden');
+  const stream = recStream;
+  mediaRecorder.onstop = () => {
+    stream.getTracks().forEach((t) => t.stop());
+    recStream = null;
+    isRecording = false;
+    if (!sendIt) return;
+    const dur = Math.max(1, Math.round((Date.now() - recStart) / 1000));
+    const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+    const reader = new FileReader();
+    reader.onload = () => {
+      const b64 = reader.result.split(',')[1];
+      send({ type: 'file', kind: 'voice', name: 'voice.webm', data: b64, mime: mediaRecorder.mimeType || 'audio/webm', duration: dur });
+    };
+    reader.readAsDataURL(blob);
+  };
+  mediaRecorder.stop();
+}
+
+// ================= WebRTC 语音通话 =================
+// ICE: 先 STUN 尝试 P2P 直连, 穿不过时用 TURN 中继(服务器转发, 保证通)
+const iceServers = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  {
+    urls: 'turn:114.132.229.58:3478?transport=udp',
+    username: 'love',
+    credential: '0f46acd18fe61a4a',
+  },
+  {
+    urls: 'turn:114.132.229.58:3478?transport=tcp',
+    username: 'love',
+    credential: '0f46acd18fe61a4a',
+  },
+];
+
+async function createPeer() {
+  pc = new RTCPeerConnection({ iceServers });
+  pc.onicecandidate = (e) => {
+    if (e.candidate) send({ type: 'signal', signal: { type: 'ice', ice: e.candidate } });
+  };
+  pc.ontrack = (e) => {
+    if (e.streams[0]) playRemoteAudio(e.streams[0]);
+  };
+  pc.onconnectionstatechange = () => {
+    if (pc && ['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
+      endCall('通话中断');
+    }
+  };
+  return pc;
+}
+
+let remoteAudio = null;
+function playRemoteAudio(stream) {
+  if (!remoteAudio) {
+    remoteAudio = new Audio();
+    remoteAudio.autoplay = true;
+    remoteAudio.style.display = 'none';
+    document.body.appendChild(remoteAudio);
+  }
+  remoteAudio.srcObject = stream;
+}
+
+async function startCall() {
+  if (callState !== 'idle') return;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    return toast('无法访问麦克风');
+  }
+  callState = 'calling';
+  pc = await createPeer();
+  localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  send({ type: 'call', action: 'invite' });
+  send({ type: 'signal', signal: { type: 'offer', sdp: pc.localDescription } });
+  showCallUI('calling', peerName);
+}
+
+async function handleCall(from, action) {
+  if (action === 'invite') {
+    if (callState !== 'idle') {
+      // 忙线
+      send({ type: 'call', action: 'busy' });
+      return;
+    }
+    callState = 'ringing';
+    pendingOffer = null;
+    peerName = from;
+    $('peerName').textContent = from;
+    $('callAvatar').textContent = avatarOf(from);
+    $('callTitle').textContent = from;
+    showCallUI('ringing', from);
+    $('callBtn').classList.add('ringing');
+  } else if (action === 'busy') {
+    endCall(from + ' 忙线中');
+  } else if (action === 'accept') {
+    if (callState === 'calling') showCallUI('talking', peerName);
+  } else if (action === 'reject') {
+    endCall('对方拒绝了通话');
+  } else if (action === 'hangup') {
+    endCall('通话已结束');
+  }
+}
+
+function showCallUI(mode, name) {
+  $('callOverlay').classList.remove('hidden');
+  $('callTitle').textContent = mode === 'talking' ? `${name} 通话中` : name;
+  $('callStatus').textContent =
+    mode === 'calling' ? '等待对方接听…' :
+    mode === 'ringing' ? '邀请你语音通话…' :
+    mode === 'talking' ? '通话时长 0:00' : '';
+  $('callReject').classList.toggle('hidden', mode === 'talking');
+  $('callAccept').classList.toggle('hidden', mode !== 'ringing');
+  $('callHangup').classList.toggle('hidden', mode === 'ringing' || mode === 'idle');
+  $('callBtn').classList.remove('ringing');
+  if (mode === 'talking') {
+    callStartTime = Date.now();
+    callTimerRaf = requestAnimationFrame(tickCallTimer);
+  }
+}
+
+function tickCallTimer() {
+  if (callState !== 'talking') return;
+  const sec = Math.floor((Date.now() - callStartTime) / 1000);
+  $('callStatus').textContent = `通话时长 ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  callTimerRaf = requestAnimationFrame(tickCallTimer);
+}
+
+function endCall(reason) {
+  if (callState === 'idle') return;
+  callState = 'idle';
+  cancelAnimationFrame(callTimerRaf);
+  if (pc) { pc.close(); pc = null; }
+  if (localStream) { localStream.getTracks().forEach((t) => t.stop()); localStream = null; }
+  if (remoteAudio) { remoteAudio.srcObject = null; remoteAudio = null; }
+  $('callOverlay').classList.add('hidden');
+  $('callBtn').classList.remove('ringing');
+  if (reason) toast(reason);
+}
+
+async function acceptCall() {
+  if (callState !== 'ringing') return;
+  if (!pendingOffer) { toast('连接未就绪，请重试'); return; }
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    return toast('无法访问麦克风');
+  }
+  callState = 'talking';
+  pc = await createPeer();
+  localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+  try {
+    await pc.setRemoteDescription(pendingOffer.sdp);
+  } catch {
+    endCall('连接失败');
+    return;
+  }
+  pendingOffer = null;
+  // 补放暂存的 ICE 候选
+  for (const c of pendingIce) { try { await pc.addIceCandidate(c); } catch {} }
+  pendingIce = [];
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  send({ type: 'signal', signal: { type: 'answer', sdp: pc.localDescription } });
+  send({ type: 'call', action: 'accept' });
+  showCallUI('talking', peerName);
+}
+
+async function handleSignal(from, signal) {
+  if (!signal) return;
+  if (signal.type === 'offer') {
+    if (callState === 'ringing') {
+      pendingOffer = signal;
+      // 已在响铃, 等用户接听
+    } else if (callState === 'idle') {
+      // 对方发 offer 但没收到 invite? 视为邀请
+      handleCall(from, 'invite');
+      pendingOffer = signal;
+    }
+  } else if (signal.type === 'answer') {
+    if (callState === 'calling' && pc) {
+      await pc.setRemoteDescription(signal.sdp);
+    }
+  } else if (signal.type === 'ice') {
+    if (pc && signal.ice) {
+      if (pc.remoteDescription) {
+        try { await pc.addIceCandidate(signal.ice); } catch {}
+      } else {
+        pendingIce.push(signal.ice); // 远端描述未就绪, 暂存
+      }
+    }
+  }
+}
+
+// ================= 事件绑定 =================
+// 发送文字
+function sendText() {
+  const input = $('textInput');
+  const text = input.value.trim();
+  if (!text) return;
+  send({ type: 'chat', text });
+  input.value = '';
+  input.focus();
+}
+$('sendBtn').onclick = sendText;
+$('textInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendText();
+  else send({ type: 'typing' });
+});
+
+// 图片 / 文件(走 HTTP 上传, 聊天只传 URL)
+$('imgBtn').onclick = () => $('imgPicker').click();
+$('fileBtn').onclick = () => $('filePicker').click();
+
+async function uploadFile(file) {
+  const fd = new FormData();
+  const ext = (file.name.match(/\.[^.]+$/) || ['.bin'])[0];
+  const resp = await fetch('/api/upload', {
+    method: 'POST',
+    body: file,
+    headers: { 'X-File-Ext': ext },
+  });
+  if (!resp.ok) throw new Error('upload failed');
+  const { url } = await resp.json();
+  return url;
+}
+
+async function readAndSend(file, kind) {
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) return toast('文件不能超过 8MB');
+  toast('上传中…');
+  try {
+    let toUpload = file;
+    if (kind === 'image' && file.type.startsWith('image/')) {
+      toUpload = await compressImage(file); // 压缩图片
+    }
+    const url = await uploadFile(toUpload);
+    send({
+      type: 'file',
+      kind,
+      name: file.name,
+      url,
+      mime: toUpload.type || 'application/octet-stream',
+    });
+  } catch {
+    toast('上传失败');
+  }
+}
+
+// 图片压缩: 最长边 1200px, JPEG 质量 0.82 — 照片 5MB -> 300KB
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const maxSide = 1200;
+      let { width, height } = img;
+      if (width > maxSide || height > maxSide) {
+        const ratio = maxSide / Math.max(width, height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('compress failed'));
+        const name = file.name.replace(/\.[^.]+$/, '.jpg');
+        resolve(new File([blob], name, { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('load failed')); };
+    img.src = url;
+  });
+}
+$('imgPicker').addEventListener('change', (e) => {
+  readAndSend(e.target.files[0], 'image');
+  e.target.value = '';
+});
+$('filePicker').addEventListener('change', (e) => {
+  readAndSend(e.target.files[0], 'file');
+  e.target.value = '';
+});
+
+// 表情
+$('emojiBtn').onclick = () => {
+  const emojis = ['❤️', '😊', '😘', '🥰', '😭', '😮', '🤔', '👏', '🌙', '☀️'];
+  const e = emojis[Math.floor(Math.random() * emojis.length)];
+  $('textInput').value += e;
+  $('textInput').focus();
+};
+
+// 录音(按住说话) — 兼容触屏+鼠标, 防止双触发
+const micBtn = $('micBtn');
+let recPointerActive = false; // 防止 touch 和 mouse 同时触发
+
+function recDown(e) {
+  e.preventDefault();
+  if (recPointerActive) return;
+  recPointerActive = true;
+  startRecording();
+}
+function recUp(e) {
+  e.preventDefault();
+  if (!recPointerActive) return;
+  recPointerActive = false;
+  stopRecording(true);
+}
+function recCancel(e) {
+  e.preventDefault();
+  if (!recPointerActive) return;
+  recPointerActive = false;
+  stopRecording(false);
+}
+
+micBtn.addEventListener('touchstart', recDown, { passive: false });
+micBtn.addEventListener('touchend', recUp, { passive: false });
+micBtn.addEventListener('touchcancel', recCancel, { passive: false });
+micBtn.addEventListener('mousedown', recDown);
+micBtn.addEventListener('mouseup', recUp);
+micBtn.addEventListener('mouseleave', recCancel);
+
+// 上滑取消: 触摸结束时在覆盖层上移除 = 取消
+$('recordingOverlay').addEventListener('touchmove', (e) => {
+  const r = $('recordingOverlay').getBoundingClientRect();
+  const t = e.touches[0];
+  if (t.clientY < r.top) {
+    $('recordingOverlay').classList.add('cancel');
+  } else {
+    $('recordingOverlay').classList.remove('cancel');
+  }
+});
+$('recordingOverlay').addEventListener('touchend', (e) => {
+  const r = $('recordingOverlay').getBoundingClientRect();
+  const t = e.changedTouches[0];
+  stopRecording(t.clientY >= r.top);
+});
+
+// 通话按钮
+$('callBtn').onclick = () => {
+  if (callState === 'idle') startCall();
+};
+$('callAccept').onclick = () => {
+  $('callOverlay').classList.add('hidden');
+  acceptCall();
+};
+$('callReject').onclick = () => {
+  send({ type: 'call', action: 'reject' });
+  endCall('已拒绝');
+};
+$('callHangup').onclick = () => {
+  send({ type: 'call', action: 'hangup' });
+  endCall();
+};
+
+// 返回
+$('backBtn').onclick = () => {
+  manualClose = true;
+  if (ws) ws.close();
+  location.reload();
+};
+
+// ================= 入口 =================
+function enter() {
+  const name = $('nameInput').value.trim() || '对方';
+  const room = $('roomInput').value.trim();
+  if (!room) { toast('请填写房间名'); return; }
+  if (!/^[A-Za-z0-9_一-龥-]{1,32}$/.test(room)) { toast('房间名不合法'); return; }
+  myName = name;
+  roomId = /^[A-Za-z0-9_-]+$/.test(room) ? room : hashRoom(room);
+  localStorage.setItem('lovechat.name', myName);
+  localStorage.setItem('lovechat.room', room);
+
+  $('lobby').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  connect();
+}
+
+function hashRoom(s) {
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+    h2 = Math.imul(h2 + c, 2246822519) >>> 0;
+  }
+  return 'r' + h1.toString(36) + h2.toString(36);
+}
+
+$('enterBtn').onclick = enter;
+$('roomInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') enter(); });
+$('nameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('roomInput').focus(); });
+
+$('nameInput').value = localStorage.getItem('lovechat.name') || '';
+$('roomInput').value = localStorage.getItem('lovechat.room') || '';
+
+// 断线自动重连 + 后台恢复
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && roomId) {
+    if (!ws || ws.readyState === WebSocket.CLOSED) { reconnectAttempt = 0; connect(); }
+  }
+});
