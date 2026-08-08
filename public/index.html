@@ -91,6 +91,38 @@
   </div>
 </div>
 
+<!-- ===== 设置面板 ===== -->
+<div id="settingsOverlay" class="call-overlay hidden">
+  <div class="call-card settings-card">
+    <div class="call-title">设置</div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">我的头像</div>
+        <div class="setting-sub">换头像后对方也能看到</div>
+      </div>
+      <div class="setting-actions">
+        <img id="myAvatarPrev" class="avatar-preview" alt="">
+        <button id="pickAvatarBtn" class="btn-mini">更换</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">聊天背景</div>
+        <div class="setting-sub">仅自己可见</div>
+      </div>
+      <div class="setting-actions">
+        <button id="pickBgBtn" class="btn-mini">更换</button>
+        <button id="resetBgBtn" class="btn-mini ghost">恢复默认</button>
+      </div>
+    </div>
+    <div class="call-actions">
+      <button id="settingsClose" class="btn-mini ghost">关闭</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="avatarPicker" class="hidden" accept="image/*">
+<input type="file" id="bgPicker" class="hidden" accept="image/*">
+
 <div id="toast" class="toast"></div>
 <script src="/app.js"></script>
 </body>

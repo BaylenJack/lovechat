@@ -24,6 +24,7 @@ let myName = '';
 let roomId = '';
 let peerName = '对方';
 let online = [];
+let avatars = {}; // name -> avatar url
 let reconnectAttempt = 0;
 let reconnectTimer = null;
 let manualClose = false;
@@ -70,7 +71,13 @@ function connect() {
 
   ws.onopen = () => {
     reconnectAttempt = 0;
-    ws.send(JSON.stringify({ type: 'join', roomId, token: TOKEN, name: myName }));
+    ws.send(JSON.stringify({
+      type: 'join',
+      roomId,
+      token: TOKEN,
+      name: myName,
+      password: localStorage.getItem('lovechat.pass') || '',
+    }));
   };
 
   ws.onmessage = (ev) => {
@@ -107,9 +114,12 @@ function setStatus(text) {
 function handle(m) {
   switch (m.type) {
     case 'joined':
+      avatars = m.avatars || {};
+      moments = m.moments || [];
       appendHistory(m.history || []);
       if (m.name) peerName = m.name;
       $('peerName').textContent = peerName;
+      updatePeerAvatar();
       setStatus('在线');
       break;
 
@@ -131,6 +141,22 @@ function handle(m) {
       if (m.from !== myName) { setStatus(`${m.from} 正在输入…`); setTimeout(() => setStatus('在线'), 1500); }
       break;
 
+    case 'avatar':
+      avatars[m.name] = m.url;
+      refreshAllAvatars();
+      break;
+
+    case 'moment':
+      moments.unshift(m.moment);
+      renderMoments();
+      break;
+
+    case 'momentUpdate': {
+      const mo = moments.find((x) => x.id === m.id);
+      if (mo) { mo.likes = m.likes || []; renderMoments(); }
+      break;
+    }
+
     case 'signal':
       handleSignal(m.from, m.signal);
       break;
@@ -141,6 +167,11 @@ function handle(m) {
 
     case 'error':
       toast(m.error || '出错了');
+      if (m.error === '密码错误') {
+        // 密码不对, 回到大厅重试
+        $('app').classList.add('hidden');
+        $('lobby').classList.remove('hidden');
+      }
       break;
   }
 }
@@ -167,6 +198,49 @@ function avatarOf(name) {
   return (name || '?').charAt(0).toUpperCase();
 }
 
+function avatarUrl(name) {
+  const url = avatars[name];
+  return url && /^\/api\/file\/[\w.-]+$/.test(url) ? url : '';
+}
+
+function refreshAllAvatars() {
+  document.querySelectorAll('.msg .avatar').forEach((el) => {
+    const name = el.dataset.name;
+    el.innerHTML = '';
+    const url = avatarUrl(name);
+    if (url) {
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = '';
+      el.appendChild(img);
+    } else {
+      el.textContent = avatarOf(name);
+    }
+  });
+  updatePeerAvatar();
+}
+
+function updatePeerAvatar() {
+  const el = $('peerAvatar');
+  el.innerHTML = '';
+  const url = avatarUrl(peerName);
+  el.innerHTML = '';
+  if (url) {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = '';
+    el.appendChild(img);
+  } else {
+    el.textContent = '?';
+  }
+  $('callAvatar').innerHTML = '';
+  if (url) $('callAvatar').appendChild(el.firstChild.cloneNode());
+  // 设置面板里的我的头像预览
+  const my = avatarUrl(myName);
+  $('myAvatarPrev').style.backgroundImage = my ? `url('${my}')` : '';
+  $('myAvatarPrev').style.backgroundSize = 'cover';
+}
+
 function renderMessage(m, isHistory = false) {
   const mine = m.from === myName;
   const list = $('msgList');
@@ -175,6 +249,7 @@ function renderMessage(m, isHistory = false) {
 
   const avatar = document.createElement('div');
   avatar.className = 'avatar';
+  avatar.dataset.name = m.from;
   avatar.textContent = avatarOf(m.from);
   row.appendChild(avatar);
 
@@ -223,6 +298,14 @@ function renderMessage(m, isHistory = false) {
   body.appendChild(bubble);
   row.appendChild(body);
   list.appendChild(row);
+  // 已有头像的话直接显示图片
+  const url = avatarUrl(m.from);
+  if (url) {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = '';
+    avatar.appendChild(img);
+  }
 }
 
 function showImagePreview(src) {
@@ -559,6 +642,29 @@ function compressImage(file) {
     img.src = url;
   });
 }
+
+// 头像: 居中裁成正方形再压缩
+function compressToSquare(file, size) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const side = Math.min(size, img.width, img.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = side;
+      canvas.height = side;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, side, side);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('compress failed'));
+        resolve(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('load failed')); };
+    img.src = url;
+  });
+}
 $('imgPicker').addEventListener('change', (e) => {
   readAndSend(e.target.files[0], 'image');
   e.target.value = '';
@@ -646,6 +752,53 @@ $('backBtn').onclick = () => {
   location.reload();
 };
 
+// ================= 设置: 头像 / 背景 =================
+$('settingsBtn').onclick = () => $('settingsOverlay').classList.remove('hidden');
+$('settingsClose').onclick = () => $('settingsOverlay').classList.add('hidden');
+$('pickAvatarBtn').onclick = () => $('avatarPicker').click();
+$('pickBgBtn').onclick = () => $('bgPicker').click();
+
+$('avatarPicker').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  toast('上传头像中…');
+  try {
+    const small = await compressToSquare(f, 320);
+    const url = await uploadFile(small);
+    send({ type: 'setAvatar', url });
+  } catch {
+    toast('头像上传失败');
+  }
+});
+
+$('bgPicker').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  toast('上传背景中…');
+  try {
+    const small = await compressImage(f);
+    const url = await uploadFile(small);
+    localStorage.setItem('lovechat.bg', url);
+    applyBg();
+  } catch {
+    toast('背景上传失败');
+  }
+});
+$('resetBgBtn').onclick = () => {
+  localStorage.removeItem('lovechat.bg');
+  applyBg();
+};
+
+function applyBg() {
+  const url = localStorage.getItem('lovechat.bg');
+  const list = $('msgList');
+  list.classList.toggle('bg-custom', !!url);
+  if (url) list.style.setProperty('--bg-url', `url('${url}')`);
+}
+applyBg();
+
 // ================= 入口 =================
 function enter() {
   const name = $('nameInput').value.trim() || '对方';
@@ -656,6 +809,9 @@ function enter() {
   roomId = /^[A-Za-z0-9_-]+$/.test(room) ? room : hashRoom(room);
   localStorage.setItem('lovechat.name', myName);
   localStorage.setItem('lovechat.room', room);
+  localStorage.setItem('lovechat.pass', $('passInput').value.trim());
+  moments = [];
+  showMoments(false);
 
   $('lobby').classList.add('hidden');
   $('app').classList.remove('hidden');
