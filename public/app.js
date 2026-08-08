@@ -420,14 +420,27 @@ async function createPeer() {
 }
 
 let remoteAudio = null;
+// 移动端(尤其 iOS)要求音频播放由用户手势触发, 需在接听/拨号时预解锁
+function unlockAudio() {
+  if (!remoteAudio) {
+    remoteAudio = new Audio();
+    remoteAudio.style.display = 'none';
+    document.body.appendChild(remoteAudio);
+  }
+  remoteAudio.muted = true;
+  remoteAudio.play().then(() => {
+    remoteAudio.muted = false;
+    if (remoteAudio.srcObject) remoteAudio.play();
+  }).catch(() => {});
+}
 function playRemoteAudio(stream) {
   if (!remoteAudio) {
     remoteAudio = new Audio();
-    remoteAudio.autoplay = true;
     remoteAudio.style.display = 'none';
     document.body.appendChild(remoteAudio);
   }
   remoteAudio.srcObject = stream;
+  remoteAudio.play().catch(() => {}); // autoplay 被拦时静默, 已有手势解锁兜底
 }
 
 async function startCall() {
@@ -735,9 +748,11 @@ $('recordingOverlay').addEventListener('touchend', (e) => {
 
 // 通话按钮
 $('callBtn').onclick = () => {
+  unlockAudio(); // 用户手势解锁音频(移动端必须)
   if (callState === 'idle') startCall();
 };
 $('callAccept').onclick = () => {
+  unlockAudio(); // 用户手势解锁音频(移动端必须)
   $('callOverlay').classList.add('hidden');
   acceptCall();
 };
