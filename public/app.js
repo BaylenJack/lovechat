@@ -32,13 +32,14 @@ let reconnectTimer = null;
 let manualClose = false;
 
 // 通话状态
-let callState = 'idle'; // idle | calling | ringing | talking
+let callState = 'idle'; // idle | calling | ringing | talking | reconnecting
 let pc = null;
 let localStream = null;
 let callStartTime = 0;
 let callTimerRaf = null;
 let pendingOffer = null;
 let pendingIce = []; // 远端描述设置前暂存 ICE 候选
+let iceRestartCount = 0; // ICE 重试次数 (最多 1 次)
 
 // 录音状态
 let mediaRecorder = null;
@@ -403,13 +404,46 @@ const iceServers = [
   },
 ];
 
+const AUDIO_CONSTRAINTS = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+  sampleRate: 48000,
+  channelCount: 1,
+  voiceIsolation: true, // iOS 15+
+};
+
 async function createPeer() {
-  pc = new RTCPeerConnection({ iceServers });
+  pc = new RTCPeerConnection({
+    iceServers,
+    iceTransportPolicy: 'all',
+    iceCandidatePoolSize: 10,
+    bundlePolicy: 'max-bundle',
+    rtcpMuxPolicy: 'require',
+    sdpSemantics: 'unified-plan',
+  });
   pc.onicecandidate = (e) => {
-    if (e.candidate) send({ type: 'signal', signal: { type: 'ice', ice: e.candidate } });
+    // 包含 null 候选 (end-of-candidates), 让对端知道可以提前协商 media
+    send({ type: 'signal', signal: { type: 'ice', ice: e.candidate } });
   };
   pc.ontrack = (e) => {
     if (e.streams[0]) playRemoteAudio(e.streams[0]);
+  };
+  pc.oniceconnectionstatechange = () => {
+    const s = pc && pc.iceConnectionState;
+    if (s === 'failed' || s === 'disconnected') {
+      // ICE 失败时尝试 ICE restart (最多 1 次)
+      if (iceRestartCount < 1 && callState === 'talking') {
+        iceRestartCount++;
+        showCallUI('reconnecting', peerName);
+        restartIce();
+      } else if (s === 'failed') {
+        endCall('通话中断');
+      }
+    } else if (s === 'connected' || s === 'completed') {
+      iceRestartCount = 0; // 重置重试计数
+      if (callState === 'reconnecting') showCallUI('talking', peerName);
+    }
   };
   pc.onconnectionstatechange = () => {
     if (pc && ['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
@@ -417,6 +451,16 @@ async function createPeer() {
     }
   };
   return pc;
+}
+
+async function restartIce() {
+  try {
+    const offer = await pc.createOffer({ iceRestart: true });
+    await pc.setLocalDescription(offer);
+    send({ type: 'signal', signal: { type: 'offer', sdp: pc.localDescription, restart: true } });
+  } catch (e) {
+    endCall('重连失败');
+  }
 }
 
 let remoteAudio = null;
@@ -428,10 +472,18 @@ function unlockAudio() {
     document.body.appendChild(remoteAudio);
   }
   remoteAudio.muted = true;
-  remoteAudio.play().then(() => {
-    remoteAudio.muted = false;
-    if (remoteAudio.srcObject) remoteAudio.play();
-  }).catch(() => {});
+  tryPlay(remoteAudio);
+}
+// play() 失败兜底: 下次任意点击再试一次(移动端常见)
+function tryPlay(audio) {
+  audio.play().then(() => {
+    audio.muted = false;
+    if (audio.srcObject) audio.play().catch(() => {});
+  }).catch(() => {
+    const retry = () => { try { audio.play(); } catch {} };
+    document.addEventListener('click', retry, { once: true });
+    document.addEventListener('touchstart', retry, { once: true });
+  });
 }
 function playRemoteAudio(stream) {
   if (!remoteAudio) {
@@ -440,17 +492,18 @@ function playRemoteAudio(stream) {
     document.body.appendChild(remoteAudio);
   }
   remoteAudio.srcObject = stream;
-  remoteAudio.play().catch(() => {}); // autoplay 被拦时静默, 已有手势解锁兜底
+  tryPlay(remoteAudio);
 }
 
 async function startCall() {
   if (callState !== 'idle') return;
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
   } catch {
     return toast('无法访问麦克风');
   }
   callState = 'calling';
+  iceRestartCount = 0;
   pc = await createPeer();
   localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
   const offer = await pc.createOffer();
@@ -492,14 +545,15 @@ function showCallUI(mode, name) {
   $('callStatus').textContent =
     mode === 'calling' ? '等待对方接听…' :
     mode === 'ringing' ? '邀请你语音通话…' :
-    mode === 'talking' ? '通话时长 0:00' : '';
-  $('callReject').classList.toggle('hidden', mode === 'talking');
+    mode === 'talking' ? '通话时长 0:00' :
+    mode === 'reconnecting' ? '重新连接中…' : '';
+  $('callReject').classList.toggle('hidden', mode === 'talking' || mode === 'reconnecting');
   $('callAccept').classList.toggle('hidden', mode !== 'ringing');
   $('callHangup').classList.toggle('hidden', mode === 'ringing' || mode === 'idle');
   $('callBtn').classList.remove('ringing');
-  if (mode === 'talking') {
-    callStartTime = Date.now();
-    callTimerRaf = requestAnimationFrame(tickCallTimer);
+  if (mode === 'talking' || mode === 'reconnecting') {
+    callStartTime = callStartTime || Date.now();
+    if (!callTimerRaf) callTimerRaf = requestAnimationFrame(tickCallTimer);
   }
 }
 
@@ -526,11 +580,12 @@ async function acceptCall() {
   if (callState !== 'ringing') return;
   if (!pendingOffer) { toast('连接未就绪，请重试'); return; }
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
   } catch {
     return toast('无法访问麦克风');
   }
   callState = 'talking';
+  iceRestartCount = 0;
   pc = await createPeer();
   localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
   try {
@@ -553,7 +608,21 @@ async function acceptCall() {
 async function handleSignal(from, signal) {
   if (!signal) return;
   if (signal.type === 'offer') {
-    if (callState === 'ringing') {
+    if (signal.restart) {
+      // ICE restart: 对方重连, 我们生成 answer
+      if (pc && (callState === 'talking' || callState === 'reconnecting')) {
+        try {
+          await pc.setRemoteDescription(signal.sdp);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          send({ type: 'signal', signal: { type: 'answer', sdp: pc.localDescription } });
+          showCallUI('reconnecting', peerName);
+          toast('重新连接中…');
+        } catch (e) {
+          endCall('重连失败');
+        }
+      }
+    } else if (callState === 'ringing') {
       pendingOffer = signal;
       // 已在响铃, 等用户接听
     } else if (callState === 'idle') {
@@ -562,11 +631,11 @@ async function handleSignal(from, signal) {
       pendingOffer = signal;
     }
   } else if (signal.type === 'answer') {
-    if (callState === 'calling' && pc) {
+    if (pc && (callState === 'calling' || callState === 'reconnecting')) {
       await pc.setRemoteDescription(signal.sdp);
     }
   } else if (signal.type === 'ice') {
-    if (pc && signal.ice) {
+    if (pc && signal.ice !== undefined) {
       if (pc.remoteDescription) {
         try { await pc.addIceCandidate(signal.ice); } catch {}
       } else {
