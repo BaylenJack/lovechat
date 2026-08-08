@@ -170,7 +170,10 @@ function handle(m) {
     case 'error':
       toast(m.error || '出错了');
       if (m.error === '密码错误') {
-        // 密码不对, 回到大厅重试
+        // 密码不对, 关掉连接回大厅重试(避免僵尸连接)
+        manualClose = true;
+        if (ws) { try { ws.close(); } catch {} }
+        ws = null;
         $('app').classList.add('hidden');
         $('lobby').classList.remove('hidden');
       }
