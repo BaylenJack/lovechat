@@ -290,6 +290,47 @@ function handle(ws, msg) {
       break;
     }
 
+    case 'setAvatar': {
+      // 换头像: url 复用 /api/file/ 上传结果, 房间内广播
+      const url = typeof msg.url === 'string' ? msg.url : '';
+      if (!/^\/api\/file\/[\w.-]+$/.test(url)) return send(ws, 'error', { error: '文件地址不合法' });
+      const room = store.rooms[roomId] || (store.rooms[roomId] = { messages: [], users: {} });
+      room.users[info.name] = url;
+      markDirty();
+      broadcast(roomId, 'avatar', { name: info.name, url });
+      break;
+    }
+
+    case 'moment': {
+      // 图文动态: text ≤ 1000, images ≤ 4 张
+      const text = typeof msg.text === 'string' ? msg.text.trim().slice(0, 1000) : '';
+      const images = Array.isArray(msg.images)
+        ? msg.images.filter((u) => typeof u === 'string' && /^\/api\/file\/[\w.-]+$/.test(u)).slice(0, 4)
+        : [];
+      if (!text && images.length === 0) return;
+      const m = { id: uuidv4(), author: info.name, text, images, at: Date.now(), likes: [] };
+      const room = store.rooms[roomId] || (store.rooms[roomId] = { messages: [], users: {} });
+      room.moments = room.moments || [];
+      room.moments.push(m);
+      if (room.moments.length > 200) room.moments.splice(0, room.moments.length - 200);
+      markDirty();
+      broadcast(roomId, 'moment', { moment: m });
+      break;
+    }
+
+    case 'momentLike': {
+      // 点赞切换: 已赞就取消, 未赞就加入
+      const id = typeof msg.id === 'string' ? msg.id : '';
+      const room = store.rooms[roomId];
+      const moment = room && room.moments && room.moments.find((x) => x.id === id);
+      if (!moment) return;
+      const i = moment.likes.indexOf(info.name);
+      if (i >= 0) moment.likes.splice(i, 1); else moment.likes.push(info.name);
+      markDirty();
+      broadcast(roomId, 'momentUpdate', { id, likes: moment.likes });
+      break;
+    }
+
     case 'typing':
       broadcast(roomId, 'typing', { from: info.name }, ws);
       break;
