@@ -327,7 +327,7 @@ function handle(ws, msg) {
       const i = moment.likes.indexOf(info.name);
       if (i >= 0) moment.likes.splice(i, 1); else moment.likes.push(info.name);
       markDirty();
-      broadcast(roomId, 'momentUpdate', { id, likes: moment.likes });
+      broadcast(roomId, 'momentUpdate', { id, likes: moment.likes }, ws);
       break;
     }
 
