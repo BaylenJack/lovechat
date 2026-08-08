@@ -392,12 +392,12 @@ const iceServers = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   {
-    urls: 'turn:114.132.229.58:3478?transport=udp',
+    urls: 'turn:47.82.0.187:3478?transport=udp',
     username: 'love',
     credential: '0f46acd18fe61a4a',
   },
   {
-    urls: 'turn:114.132.229.58:3478?transport=tcp',
+    urls: 'turn:47.82.0.187:3478?transport=tcp',
     username: 'love',
     credential: '0f46acd18fe61a4a',
   },
