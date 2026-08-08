@@ -3,6 +3,7 @@ node_modules/
 
 # 运行时数据
 data/rooms.json
+data/messages.json
 data/files/
 
 # 系统文件
@@ -23,4 +24,4 @@ yarn-error.log*
 
 # 测试
 coverage/
-.nyc_output/data/messages.json
+.nyc_output/
