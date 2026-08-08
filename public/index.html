@@ -30,8 +30,12 @@
       <span>房间名</span>
       <input id="roomInput" maxlength="32" placeholder="两人约定同一个房间名" autocomplete="off">
     </label>
+    <label class="field">
+      <span>房间密码</span>
+      <input id="passInput" maxlength="64" type="password" placeholder="新房间可设置，已有房间需填写" autocomplete="off">
+    </label>
     <button id="enterBtn" class="btn-primary">进入客厅</button>
-    <p class="hint">告诉对方同一个房间名，你们就能在这里聊天了。</p>
+    <p class="hint">告诉对方同一个房间名和密码，你们就能在这里聊天了。</p>
   </div>
 </div>
 
@@ -46,6 +50,8 @@
         <div class="peer-status" id="peerStatus">连接中…</div>
       </div>
     </div>
+    <button id="momentsBtn" class="call-btn" title="动态">🌙</button>
+    <button id="settingsBtn" class="call-btn" title="设置">⚙️</button>
     <button id="callBtn" class="call-btn" title="语音通话">📞</button>
   </header>
 
@@ -53,7 +59,7 @@
     <div class="day-divider">开始聊天吧</div>
   </div>
 
-  <footer class="inputbar">
+  <footer id="inputbar" class="inputbar">
     <button id="micBtn" class="input-btn" title="按住说话">🎤</button>
     <button id="imgBtn" class="input-btn" title="发送照片">📷</button>
     <button id="fileBtn" class="input-btn" title="发送文件">📎</button>
