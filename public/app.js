@@ -408,20 +408,11 @@ const AUDIO_CONSTRAINTS = {
   echoCancellation: true,
   noiseSuppression: true,
   autoGainControl: true,
-  sampleRate: 48000,
-  channelCount: 1,
-  voiceIsolation: true, // iOS 15+
 };
 
 async function createPeer() {
-  pc = new RTCPeerConnection({
-    iceServers,
-    iceTransportPolicy: 'all',
-    iceCandidatePoolSize: 10,
-    bundlePolicy: 'max-bundle',
-    rtcpMuxPolicy: 'require',
-    sdpSemantics: 'unified-plan',
-  });
+  // 只用基础 ICE 配置, 兼容所有浏览器
+  pc = new RTCPeerConnection({ iceServers });
   pc.onicecandidate = (e) => {
     // 包含 null 候选 (end-of-candidates), 让对端知道可以提前协商 media
     send({ type: 'signal', signal: { type: 'ice', ice: e.candidate } });
@@ -531,7 +522,10 @@ async function handleCall(from, action) {
   } else if (action === 'busy') {
     endCall(from + ' 忙线中');
   } else if (action === 'accept') {
-    if (callState === 'calling') showCallUI('talking', peerName);
+    if (callState === 'calling') {
+      callState = 'talking';
+      showCallUI('talking', peerName);
+    }
   } else if (action === 'reject') {
     endCall('对方拒绝了通话');
   } else if (action === 'hangup') {
@@ -567,7 +561,8 @@ function tickCallTimer() {
 function endCall(reason) {
   if (callState === 'idle') return;
   callState = 'idle';
-  cancelAnimationFrame(callTimerRaf);
+  if (callTimerRaf) cancelAnimationFrame(callTimerRaf);
+  callTimerRaf = null;
   if (pc) { pc.close(); pc = null; }
   if (localStream) { localStream.getTracks().forEach((t) => t.stop()); localStream = null; }
   if (remoteAudio) { remoteAudio.srcObject = null; remoteAudio = null; }
