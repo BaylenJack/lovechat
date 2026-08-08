@@ -5,6 +5,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
@@ -173,6 +174,9 @@ function persistMessage(roomId, msg) {
 const validToken = (t) => typeof t === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(t);
 const validRoom = (r) => typeof r === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(r);
 
+// 密码哈希 — 只存哈希不存明文 (sha256(password + roomId))
+const hashPass = (pw, roomId) => createHash('sha256').update(pw + '@' + roomId).digest('hex');
+
 wss.on('connection', (ws) => {
   ws.isAlive = true;
   clients.set(ws, {});
@@ -205,13 +209,26 @@ function handle(ws, msg) {
     if (!validRoom(msg.roomId) || !validToken(msg.token)) return send(ws, 'error', { error: '参数不合法' });
     const roomId = msg.roomId;
     const name = typeof msg.name === 'string' ? msg.name.slice(0, 16) || '对方' : '对方';
+    const room = store.rooms[roomId] || (store.rooms[roomId] = { messages: [], users: {} });
+    // 房间密码: 首个进入者设置, 之后进入需验证
+    const password = typeof msg.password === 'string' ? msg.password.trim() : '';
+    if (room.passhash) {
+      if (!password || hashPass(password, roomId) !== room.passhash) return send(ws, 'error', { error: '密码错误' });
+    } else if (password) {
+      room.passhash = hashPass(password, roomId);
+      markDirty();
+    }
     info.roomId = roomId;
     info.token = msg.token;
     info.name = name;
     roomClients(roomId).add(ws);
 
-    const room = store.rooms[roomId] || (store.rooms[roomId] = { messages: [] });
-    send(ws, 'joined', { name, history: room.messages.slice(-100) });
+    send(ws, 'joined', {
+      name,
+      history: room.messages.slice(-100),
+      avatars: room.users || {},
+      moments: room.moments || [],
+    });
     broadcastPresence(roomId);
     return;
   }
