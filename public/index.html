@@ -59,6 +59,20 @@
     <div class="day-divider">开始聊天吧</div>
   </div>
 
+  <!-- ===== 动态视图 ===== -->
+  <div id="momentsView" class="moments hidden">
+    <div class="moment-compose">
+      <textarea id="momentText" class="moment-text" maxlength="1000" rows="2" placeholder="想分享点什么…"></textarea>
+      <div id="momentPics" class="moment-pics"></div>
+      <div class="moment-actions">
+        <button id="momentPicBtn" class="btn-mini ghost">📷 加图</button>
+        <button id="momentSend" class="btn-mini">发布</button>
+      </div>
+    </div>
+    <div id="momentList" class="moment-list"></div>
+  </div>
+  <input type="file" id="momentPicker" class="hidden" accept="image/*" multiple>
+
   <footer id="inputbar" class="inputbar">
     <button id="micBtn" class="input-btn" title="按住说话">🎤</button>
     <button id="imgBtn" class="input-btn" title="发送照片">📷</button>

@@ -25,6 +25,8 @@ let roomId = '';
 let peerName = '对方';
 let online = [];
 let avatars = {}; // name -> avatar url
+let moments = []; // 动态列表
+let momentImages = []; // 发布框待发图片 url
 let reconnectAttempt = 0;
 let reconnectTimer = null;
 let manualClose = false;
@@ -798,6 +800,104 @@ function applyBg() {
   if (url) list.style.setProperty('--bg-url', `url('${url}')`);
 }
 applyBg();
+
+// ================= 动态 =================
+function showMoments(show) {
+  $('momentsView').classList.toggle('hidden', !show);
+  $('msgList').classList.toggle('hidden', show);
+  $('inputbar').classList.toggle('hidden', show);
+  if (show) renderMoments();
+}
+$('momentsBtn').onclick = () => showMoments($('momentsView').classList.contains('hidden'));
+
+function renderMoments() {
+  const list = $('momentList');
+  list.innerHTML = '';
+  for (const mo of moments) {
+    const card = document.createElement('div');
+    card.className = 'moment-card';
+    card.innerHTML = `
+      <div class="moment-head">
+        <div class="avatar">${avatarOf(mo.author)}</div>
+        <div>
+          <div class="moment-author"></div>
+          <div class="moment-time">${fmtTime(mo.at)}</div>
+        </div>
+      </div>
+      ${mo.text ? '<div class="moment-text-body"></div>' : ''}
+      ${mo.images && mo.images.length ? '<div class="moment-grid"></div>' : ''}
+      <div class="moment-like${mo.likes && mo.likes.includes(myName) ? ' on' : ''}">
+        <span class="heart">❤️</span><span class="like-count"></span>
+      </div>`;
+    card.querySelector('.moment-author').textContent = mo.author;
+    // 作者头像
+    const av = card.querySelector('.moment-head .avatar');
+    const url = avatarUrl(mo.author);
+    if (url) {
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = '';
+      av.appendChild(img);
+    }
+    if (mo.text) card.querySelector('.moment-text-body').textContent = mo.text;
+    if (mo.images && mo.images.length) {
+      const grid = card.querySelector('.moment-grid');
+      for (const u of mo.images) {
+        const img = document.createElement('img');
+        img.src = u;
+        img.loading = 'lazy';
+        img.onclick = () => showImagePreview(u);
+        grid.appendChild(img);
+      }
+    }
+    card.querySelector('.like-count').textContent = mo.likes && mo.likes.length ? mo.likes.length : '点赞';
+    card.querySelector('.moment-like').onclick = () => send({ type: 'momentLike', id: mo.id });
+    list.appendChild(card);
+  }
+}
+
+// 发布框选图(压缩后上传, 最多 4 张)
+$('momentPicBtn').onclick = () => $('momentPicker').click();
+$('momentPicker').addEventListener('change', async (e) => {
+  const files = [...e.target.files].slice(0, 4 - momentImages.length);
+  e.target.value = '';
+  if (!files.length) return;
+  toast('上传图片中…');
+  for (const f of files) {
+    try {
+      const small = await compressImage(f);
+      const url = await uploadFile(small);
+      momentImages.push(url);
+      renderMomentPics();
+    } catch {
+      toast('图片上传失败');
+    }
+  }
+});
+function renderMomentPics() {
+  const box = $('momentPics');
+  box.innerHTML = '';
+  momentImages.forEach((u, i) => {
+    const w = document.createElement('div');
+    w.className = 'pic-x';
+    const img = document.createElement('img');
+    img.src = u;
+    w.appendChild(img);
+    w.onclick = () => {
+      momentImages.splice(i, 1);
+      renderMomentPics();
+    };
+    box.appendChild(w);
+  });
+}
+$('momentSend').onclick = () => {
+  const text = $('momentText').value.trim();
+  if (!text && !momentImages.length) return toast('写点内容或加张图吧');
+  send({ type: 'moment', text, images: momentImages });
+  $('momentText').value = '';
+  momentImages = [];
+  renderMomentPics();
+};
 
 // ================= 入口 =================
 function enter() {
