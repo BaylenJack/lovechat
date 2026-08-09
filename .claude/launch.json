@@ -6,6 +6,14 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["src/server.js"],
       "port": 8100
+    },
+    {
+      "name": "lovechat-verify",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["src/server.js"],
+      "env": { "PORT": "8110" },
+      "port": 8110,
+      "url": "http://localhost:8110"
     }
   ]
 }

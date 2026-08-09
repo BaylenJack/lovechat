@@ -60,6 +60,19 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.webm': 'audio/webm',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.pdf': 'application/pdf',
+  '.txt': 'text/plain; charset=utf-8',
+  '.json': 'application/json',
+  '.zip': 'application/zip',
 };
 
 const server = http.createServer();
@@ -102,7 +115,10 @@ server.on('request', (req, res) => {
     if (!file.startsWith(FILES_DIR) || !fs.existsSync(file)) {
       res.writeHead(404); return res.end('not found');
     }
-    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'max-age=86400' });
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(id).toLowerCase()] || 'application/octet-stream',
+      'Cache-Control': 'max-age=86400',
+    });
     fs.createReadStream(file).pipe(res);
     return;
   }
@@ -126,7 +142,8 @@ server.on('request', (req, res) => {
       const ext = path.extname(file).toLowerCase();
       res.writeHead(200, {
         'Content-Type': MIME[ext] || 'application/octet-stream',
-        'Cache-Control': ext === '.html' ? 'no-cache' : 'max-age=3600',
+        // 代码更新后浏览器要能拿到新版本: html/js/css 不缓存, 其余走短缓存
+        'Cache-Control': ext === '.html' || ext === '.js' || ext === '.css' ? 'no-cache' : 'max-age=3600',
       });
       res.end(buf);
     });
@@ -256,6 +273,7 @@ function handle(ws, msg) {
           name: typeof msg.name === 'string' ? msg.name.slice(0, 128) : 'file',
           url: msg.url,
           mime: typeof msg.mime === 'string' ? msg.mime.slice(0, 64) : '',
+          duration: msg.duration ? Math.min(parseInt(msg.duration, 10) || 0, 600) : 0,
           from: info.name, at: Date.now(),
         };
         persistMessage(roomId, m);

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@1&display=swap">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/style.css?v=2">
 </head>
 <body>
 
@@ -79,6 +79,9 @@
     <input id="textInput" class="text-input" type="text" placeholder="输入消息…" autocomplete="off">
     <button id="sendBtn" class="send-btn hidden">发送</button>
 
+    <!-- 表情面板 -->
+    <div id="emojiPanel" class="emoji-panel hidden"></div>
+
     <!-- 按住说话覆盖层 -->
     <div id="recordingOverlay" class="recording hidden">
       <div class="rec-order">松开发送 · 上滑取消</div>
@@ -135,7 +138,23 @@
 <input type="file" id="avatarPicker" class="hidden" accept="image/*">
 <input type="file" id="bgPicker" class="hidden" accept="image/*">
 
+<!-- ===== 头像裁剪器(微信式正方形选区) ===== -->
+<div id="cropOverlay" class="call-overlay hidden">
+  <div class="crop-card">
+    <div class="crop-title">调整头像</div>
+    <div class="crop-stage" id="cropStage">
+      <img id="cropImg" alt="">
+      <div class="crop-box" id="cropBox"><span class="crop-grip grip-nw"></span><span class="crop-grip grip-ne"></span><span class="crop-grip grip-sw"></span><span class="crop-grip grip-se"></span></div>
+      <div class="crop-hint">拖动移动 · 缩放框调整大小</div>
+    </div>
+    <div class="crop-actions">
+      <button id="cropCancel" class="btn-mini ghost">取消</button>
+      <button id="cropConfirm" class="btn-mini">确定</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
-<script src="/app.js"></script>
+<script src="/app.js?v=2"></script>
 </body>
 </html>

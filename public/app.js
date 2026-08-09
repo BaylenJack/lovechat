@@ -47,6 +47,7 @@ let recChunks = [];
 let recStart = 0;
 let recTimerRaf = null;
 let recStream = null;
+let autoPlayVoice = true; // 刚发出去的语音条自动播放一次(像微信)
 
 // ================= 提示 =================
 let toastTimer = null;
@@ -287,7 +288,20 @@ function renderMessage(m, isHistory = false) {
       <span class="v-icon">▶</span>
       <span class="v-bar">${'<i></i>'.repeat(Math.max(4, Math.min(16, Math.ceil(dur / 2))))}</span>
       <span class="v-dur">${dur}"</span>`;
-    bubble.onclick = () => playVoice(m.data, m.mime);
+    bubble.onclick = () => {
+      const a = playVoice(m, true);
+      if (a) {
+        bubble.classList.add('playing');
+        a.onended = () => bubble.classList.remove('playing');
+        a.onerror = () => { bubble.classList.remove('playing'); toast('语音播放失败'); };
+      }
+    };
+    // 我的新语音(刚发出去的)自动播放 — 本地播放不依赖对端
+    if (!isHistory && mine && m.url && autoPlayVoice) {
+      autoPlayVoice = false;
+      const a = playVoice(m, true);
+      if (a) { bubble.classList.add('playing'); a.onended = () => bubble.classList.remove('playing'); }
+    }
   } else if (m.kind === 'file') {
     bubble.classList.add('file');
     bubble.innerHTML = `<span class="f-icon">📄</span><span class="f-name"></span>`;
@@ -325,11 +339,15 @@ function showImagePreview(src) {
 }
 
 // ================= 语音条播放 =================
+// 播放走 /api/file/ 流式(HTTP 直接播放, 不整包进内存); 兼容旧消息的 base64 data
 let audioEl = null;
-function playVoice(b64, mime) {
-  if (audioEl) audioEl.pause();
-  audioEl = new Audio('data:' + (mime || 'audio/webm') + ';base64,' + b64);
-  audioEl.play();
+function playVoice(m, auto = false) {
+  if (audioEl) { audioEl.pause(); audioEl = null; }
+  const src = m.url ? m.url : ('data:' + (m.mime || 'audio/webm') + ';base64,' + (m.data || ''));
+  if (!src) return;
+  audioEl = new Audio(src);
+  if (auto) audioEl.play();
+  return audioEl;
 }
 
 // ================= 录音 =================
@@ -377,19 +395,22 @@ function stopRecording(sendIt = true) {
     if (!sendIt) return;
     const dur = Math.max(1, Math.round((Date.now() - recStart) / 1000));
     const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-    const reader = new FileReader();
-    reader.onload = () => {
-      const b64 = reader.result.split(',')[1];
-      send({ type: 'file', kind: 'voice', name: 'voice.webm', data: b64, mime: mediaRecorder.mimeType || 'audio/webm', duration: dur });
-    };
-    reader.readAsDataURL(blob);
+    // 语音走 HTTP 上传(服务端流式播放), 不再整包 base64 走 WS
+    toast('上传语音…');
+    uploadFile(new File([blob], 'voice.webm', { type: blob.type }))
+      .then((url) => {
+        send({ type: 'file', kind: 'voice', name: 'voice.webm', url, mime: blob.type || 'audio/webm', duration: dur });
+        if (autoPlayVoice) playVoice({ url, mime: blob.type || 'audio/webm' }, true);
+      })
+      .catch(() => toast('语音上传失败'));
   };
   mediaRecorder.stop();
 }
 
 // ================= WebRTC 语音通话 =================
-// ICE: 先 STUN 尝试 P2P 直连, 穿不过时用 TURN 中继(服务器转发, 保证通)
+// ICE: 先 STUN 尝试 P2P 直连(自建 STUN 优先, 国内可达), 穿不过时用 TURN 中继
 const iceServers = [
+  { urls: 'stun:47.82.0.187:3478' },
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   {
@@ -757,12 +778,37 @@ $('filePicker').addEventListener('change', (e) => {
 });
 
 // 表情
-$('emojiBtn').onclick = () => {
-  const emojis = ['❤️', '😊', '😘', '🥰', '😭', '😮', '🤔', '👏', '🌙', '☀️'];
-  const e = emojis[Math.floor(Math.random() * emojis.length)];
-  $('textInput').value += e;
-  $('textInput').focus();
-};
+const EMOJIS = ['❤️', '😊', '😘', '🥰', '😭', '😮', '🤔', '👏', '🌙', '☀️',
+  '😂', '🤣', '😍', '😜', '🤗', '😇', '😴', '🥺', '😳', '🔥',
+  '💔', '💖', '💝', '💕', '✨', '🌟', '🎉', '🍀', '🌹', '🐱',
+  '🍰', '☕', '🎵', '💤', '🙏', '👍', '💪', '👋', '🫶', '🥹'];
+function toggleEmojiPanel() {
+  const panel = $('emojiPanel');
+  if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
+  if (!panel.dataset.built) {
+    panel.dataset.built = '1';
+    for (const e of EMOJIS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'emoji-cell';
+      b.textContent = e;
+      b.onclick = () => {
+        $('textInput').value += e;
+        $('textInput').focus();
+        panel.classList.add('hidden');
+      };
+      panel.appendChild(b);
+    }
+  }
+  panel.classList.remove('hidden');
+}
+$('emojiBtn').onclick = (e) => { e.stopPropagation(); toggleEmojiPanel(); };
+// 点击面板外部/发送后收起
+document.addEventListener('click', (e) => {
+  const panel = $('emojiPanel');
+  if (!panel.classList.contains('hidden') && !panel.contains(e.target)) panel.classList.add('hidden');
+});
+$('sendBtn').onclick = () => $('emojiPanel').classList.add('hidden');
 
 // 录音(按住说话) — 兼容触屏+鼠标, 防止双触发
 const micBtn = $('micBtn');
@@ -846,15 +892,165 @@ $('avatarPicker').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f) return;
-  toast('上传头像中…');
+  if (!f.type.startsWith('image/')) return toast('请选择图片');
   try {
-    const small = await compressToSquare(f, 320);
+    // 裁剪器: 微信式正方形选区, 可拖动/缩放
+    const cropped = await openCropper(f);
+    if (!cropped) return; // 用户取消
+    const small = await compressToSquare(cropped, 320);
     const url = await uploadFile(small);
     send({ type: 'setAvatar', url });
+    toast('头像已更新');
   } catch {
     toast('头像上传失败');
   }
 });
+
+// ---------- 头像裁剪器 ----------
+function openCropper(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    const stage = $('cropStage');
+    const imgEl = $('cropImg');
+    const box = $('cropBox');
+    const overlay = $('cropOverlay');
+    let state = { x: 0, y: 0, side: 0, imgW: 0, imgH: 0, dispW: 0, dispH: 0 };
+    let drag = null; // { mode: 'move'|'grip', startX, startY, orig }
+    let resolveFn = null;
+
+    const fit = () => {
+      // 图片等比缩放填满裁剪舞台, 裁剪框默认取图片中心的正方形
+      const sr = stage.clientWidth / stage.clientHeight;
+      const ir = img.naturalWidth / img.naturalHeight;
+      let dispW, dispH;
+      if (ir > sr) { dispW = stage.clientWidth; dispH = dispW / ir; }
+      else { dispH = stage.clientHeight; dispW = dispH * ir; }
+      state = { ...state, imgW: img.naturalWidth, imgH: img.naturalHeight, dispW, dispH };
+      imgEl.style.width = dispW + 'px';
+      imgEl.style.height = dispH + 'px';
+      imgEl.style.left = (stage.clientWidth - dispW) / 2 + 'px';
+      imgEl.style.top = (stage.clientHeight - dispH) / 2 + 'px';
+      const side = Math.min(dispW, dispH) * 0.9;
+      state.side = side;
+      state.x = (dispW - side) / 2;
+      state.y = (dispH - side) / 2;
+      applyBox();
+    };
+
+    const applyBox = () => {
+      const left = (stage.clientWidth - state.dispW) / 2 + state.x;
+      const top = (stage.clientHeight - state.dispH) / 2 + state.y;
+      box.style.left = left + 'px';
+      box.style.top = top + 'px';
+      box.style.width = state.side + 'px';
+      box.style.height = state.side + 'px';
+    };
+
+    // 取裁剪框在原始图片里的坐标
+    const cropRect = () => {
+      const scale = state.imgW / state.dispW;
+      return {
+        sx: Math.max(0, state.x * scale),
+        sy: Math.max(0, state.y * scale),
+        s: Math.min(state.side * scale, state.imgW - Math.max(0, state.x * scale), state.imgH - Math.max(0, state.y * scale)),
+      };
+    };
+
+    const inBounds = (x, y) => x >= 0 && y >= 0 && x + state.side <= state.dispW && y + state.side <= state.dispH;
+
+    const onMove = (cx, cy) => {
+      if (!drag) return;
+      const dx = cx - drag.startX, dy = cy - drag.startY;
+      if (drag.mode === 'move') {
+        const nx = Math.min(Math.max(drag.orig.x + dx, 0), state.dispW - state.side);
+        const ny = Math.min(Math.max(drag.orig.y + dy, 0), state.dispH - state.side);
+        state.x = nx; state.y = ny;
+      } else { // 右下角手柄缩放(保持正方形)
+        const side = Math.min(
+          Math.max(drag.orig.side + Math.max(dx, dy), 48),
+          Math.min(state.dispW - drag.orig.x, state.dispH - drag.orig.y),
+        );
+        state.side = side;
+      }
+      applyBox();
+    };
+
+    const onUp = () => { drag = null; };
+
+    const bind = (el, onDown) => {
+      el.addEventListener('touchstart', onDownTouch, { passive: false });
+      el.addEventListener('mousedown', onDownMouse);
+      function onDownTouch(e) { e.preventDefault(); const t = e.touches[0]; onDown(t.clientX, t.clientY); }
+      function onDownMouse(e) { e.preventDefault(); onDown(e.clientX, e.clientY); }
+      return [el, onDownTouch, onDownMouse];
+    };
+    // move/up 绑 document: 拖动中指针离开选框也不断
+    function onTouchMove(e) {
+      if (!drag) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      onMove(t.clientX, t.clientY);
+    }
+    function onMouseMove(e) { if (drag) onMove(e.clientX, e.clientY); }
+    const bound = [];
+    bound.push(bind(box, (cx, cy) => {
+      if (cx > box.offsetLeft + box.offsetWidth - 24 && cy > box.offsetTop + box.offsetHeight - 24) {
+        drag = { mode: 'grip', startX: cx, startY: cy, orig: { ...state } };
+      } else {
+        drag = { mode: 'move', startX: cx, startY: cy, orig: { ...state } };
+      }
+    }));
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onUp);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onUp);
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objUrl);
+      overlay.classList.add('hidden');
+      for (const entry of bound) {
+        const [el, t, m] = entry;
+        el.removeEventListener('touchstart', t);
+        el.removeEventListener('mousedown', m);
+      }
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onUp);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onUp);
+      drag = null;
+    };
+
+    overlay.classList.remove('hidden');
+    resolveFn = resolve;
+    const confirmBtn = $('cropConfirm');
+    confirmBtn.disabled = true; // 图片加载完成前不可确认
+    img.onload = () => {
+      fit();
+      confirmBtn.disabled = false;
+    };
+    img.onerror = () => {
+      toast('图片加载失败');
+      cleanup();
+      resolveFn(false);
+    };
+    img.src = objUrl;
+
+    $('cropCancel').onclick = () => { cleanup(); resolveFn(false); };
+    $('cropConfirm').onclick = () => {
+      const { sx, sy, s } = cropRect();
+      if (s < 8) return toast('选区太小');
+      const canvas = document.createElement('canvas');
+      canvas.width = s; canvas.height = s;
+      canvas.getContext('2d').drawImage(img, sx, sy, s, s, 0, 0, s, s);
+      canvas.toBlob((blob) => {
+        if (!blob) { cleanup(); resolveFn(false); return toast('裁剪失败'); }
+        cleanup();
+        resolveFn(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.9);
+    };
+  });
+}
 
 $('bgPicker').addEventListener('change', async (e) => {
   const f = e.target.files[0];
