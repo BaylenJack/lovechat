@@ -666,14 +666,16 @@ async function handleSignal(from, signal) {
   } else if (signal.type === 'answer') {
     if (pc && (callState === 'calling' || callState === 'reconnecting')) {
       await pc.setRemoteDescription(signal.sdp);
+      // 补放暂存的 ICE 候选(响铃/呼叫阶段收到但 pc 未就绪)
+      for (const c of pendingIce) { try { await pc.addIceCandidate(c); } catch {} }
+      pendingIce = [];
     }
   } else if (signal.type === 'ice') {
-    if (pc && signal.ice !== undefined) {
-      if (pc.remoteDescription) {
-        try { await pc.addIceCandidate(signal.ice); } catch {}
-      } else {
-        pendingIce.push(signal.ice); // 远端描述未就绪, 暂存
-      }
+    if (signal.ice === undefined) return;
+    if (pc && pc.remoteDescription) {
+      try { await pc.addIceCandidate(signal.ice); } catch {}
+    } else {
+      pendingIce.push(signal.ice); // pc 未创建或远端描述未就绪都暂存, 稍后补放
     }
   }
 }
