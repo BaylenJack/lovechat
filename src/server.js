@@ -203,8 +203,7 @@ wss.on('connection', (ws) => {
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return send(ws, 'error', { error: '消息格式错误' }); }
     if (!msg || typeof msg.type !== 'string') return;
-    try { handle(ws, msg); } catch (e) { console.error('[ws] 处理出错:', e); send(ws, 'error', { error: '服务器处理出错' }); }
-  });
+    try { handle(ws, msg); } catch (e) { console.error('[ws] 处理出错:', e); send(ws, 'error', { error: '服务器处理出错' }); }  });
 
   ws.on('close', () => {
     const info = clients.get(ws);

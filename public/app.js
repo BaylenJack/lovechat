@@ -170,6 +170,7 @@ function handle(m) {
       break;
 
     case 'error':
+      console.warn('[ws error]', m.error, m); // 定位服务器错误来源
       toast(m.error || '出错了');
       if (m.error === '密码错误') {
         // 密码不对, 关掉连接回大厅重试(避免僵尸连接)
@@ -257,7 +258,6 @@ function renderMessage(m, isHistory = false) {
   const avatar = document.createElement('div');
   avatar.className = 'avatar';
   avatar.dataset.name = m.from;
-  avatar.textContent = avatarOf(m.from);
   row.appendChild(avatar);
 
   const body = document.createElement('div');
@@ -318,13 +318,15 @@ function renderMessage(m, isHistory = false) {
   body.appendChild(bubble);
   row.appendChild(body);
   list.appendChild(row);
-  // 已有头像的话直接显示图片
+  // 已有头像直接显示图, 没头像时回退到首字(避免空白)
   const url = avatarUrl(m.from);
   if (url) {
     const img = document.createElement('img');
     img.src = url;
     img.alt = '';
     avatar.appendChild(img);
+  } else {
+    avatar.textContent = avatarOf(m.from);
   }
 }
 
@@ -476,6 +478,14 @@ async function restartIce() {
 }
 
 let remoteAudio = null;
+// 安卓 Chrome 需要激活 AudioContext 才会输出媒体轨(否则 addTrack 是静音轨)
+let audioCtx = null;
+function ensureAudioContext() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) { /* 激活失败不阻塞通话 */ }
+}
 // 移动端(尤其 iOS)要求音频播放由用户手势触发, 需在接听/拨号时预解锁
 function unlockAudio() {
   if (!remoteAudio) {
@@ -511,11 +521,14 @@ async function startCall() {
   if (callState !== 'idle') return;
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
+    ensureAudioContext(); // 安卓 Chrome 必须, 否则发出的轨道无声
+    localStream.getAudioTracks().forEach((t) => { t.enabled = true; });
   } catch {
     return toast('无法访问麦克风');
   }
   callState = 'calling';
   iceRestartCount = 0;
+  callStartTime = 0; // 新通话从 0 开始计时
   pc = await createPeer();
   localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
   const offer = await pc.createOffer();
@@ -582,6 +595,7 @@ function tickCallTimer() {
 function endCall(reason) {
   if (callState === 'idle') return;
   callState = 'idle';
+  callStartTime = 0; // 挂断后重置, 下次通话从 0 开始
   if (callTimerRaf) cancelAnimationFrame(callTimerRaf);
   callTimerRaf = null;
   if (pc) { pc.close(); pc = null; }
@@ -597,11 +611,14 @@ async function acceptCall() {
   if (!pendingOffer) { toast('连接未就绪，请重试'); return; }
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
+    ensureAudioContext(); // 安卓 Chrome 必须, 否则发出的轨道无声
+    localStream.getAudioTracks().forEach((t) => { t.enabled = true; });
   } catch {
     return toast('无法访问麦克风');
   }
   callState = 'talking';
   iceRestartCount = 0;
+  callStartTime = 0; // 新通话从 0 开始计时
   pc = await createPeer();
   localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
   try {
@@ -909,10 +926,9 @@ $('avatarPicker').addEventListener('change', async (e) => {
 // ---------- 头像裁剪器 ----------
 function openCropper(file) {
   return new Promise((resolve) => {
-    const img = new Image();
     const objUrl = URL.createObjectURL(file);
     const stage = $('cropStage');
-    const imgEl = $('cropImg');
+    const img = $('cropImg'); // 直接加载到 DOM 元素, 否则界面不显示图
     const box = $('cropBox');
     const overlay = $('cropOverlay');
     let state = { x: 0, y: 0, side: 0, imgW: 0, imgH: 0, dispW: 0, dispH: 0 };
@@ -920,18 +936,22 @@ function openCropper(file) {
     let resolveFn = null;
 
     const fit = () => {
-      // 图片等比缩放填满裁剪舞台, 裁剪框默认取图片中心的正方形
+      // 长宽比 > 2 时 cover(铺满, 有裁剪); 否则 contain(留白, 完整可见)
       const sr = stage.clientWidth / stage.clientHeight;
       const ir = img.naturalWidth / img.naturalHeight;
       let dispW, dispH;
-      if (ir > sr) { dispW = stage.clientWidth; dispH = dispW / ir; }
+      const useCover = ir > 2 || ir < 0.5;
+      if (useCover) {
+        if (ir > 1) { dispH = stage.clientHeight; dispW = dispH * ir; }
+        else { dispW = stage.clientWidth; dispH = dispW / ir; }
+      } else if (ir > sr) { dispW = stage.clientWidth; dispH = dispW / ir; }
       else { dispH = stage.clientHeight; dispW = dispH * ir; }
-      state = { ...state, imgW: img.naturalWidth, imgH: img.naturalHeight, dispW, dispH };
-      imgEl.style.width = dispW + 'px';
-      imgEl.style.height = dispH + 'px';
-      imgEl.style.left = (stage.clientWidth - dispW) / 2 + 'px';
-      imgEl.style.top = (stage.clientHeight - dispH) / 2 + 'px';
-      const side = Math.min(dispW, dispH) * 0.9;
+      state = { ...state, imgW: img.naturalWidth, imgH: img.naturalHeight, dispW, dispH, cover: useCover };
+      img.style.width = dispW + 'px';
+      img.style.height = dispH + 'px';
+      img.style.left = (stage.clientWidth - dispW) / 2 + 'px';
+      img.style.top = (stage.clientHeight - dispH) / 2 + 'px';
+      const side = Math.max(48, Math.min(dispW, dispH) - 4);
       state.side = side;
       state.x = (dispW - side) / 2;
       state.y = (dispH - side) / 2;
@@ -1025,12 +1045,34 @@ function openCropper(file) {
     resolveFn = resolve;
     const confirmBtn = $('cropConfirm');
     confirmBtn.disabled = true; // 图片加载完成前不可确认
+    let downgraded = false; // 是否已做过大图降级
     img.onload = () => {
+      // 大图降级: iOS 原图(4800万像素)会超出 canvas 上限, 先等比缩到 2000px 内
+      if (!downgraded && (img.naturalWidth > 2000 || img.naturalHeight > 2000)) {
+        downgraded = true;
+        const scale = 2000 / Math.max(img.naturalWidth, img.naturalHeight);
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * scale);
+        c.height = Math.round(img.naturalHeight * scale);
+        try {
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        } catch {
+          toast('图片过大，处理失败');
+          cleanup();
+          resolveFn(false);
+          return;
+        }
+        c.toBlob((blob) => {
+          if (!blob) { toast('图片处理失败'); cleanup(); resolveFn(false); return; }
+          img.src = URL.createObjectURL(blob); // 重新触发 onload, 走正常 fit()
+        }, 'image/jpeg', 0.9);
+        return;
+      }
       fit();
       confirmBtn.disabled = false;
     };
     img.onerror = () => {
-      toast('图片加载失败');
+      toast('图片加载失败，请换一张');
       cleanup();
       resolveFn(false);
     };
@@ -1040,9 +1082,16 @@ function openCropper(file) {
     $('cropConfirm').onclick = () => {
       const { sx, sy, s } = cropRect();
       if (s < 8) return toast('选区太小');
-      const canvas = document.createElement('canvas');
-      canvas.width = s; canvas.height = s;
-      canvas.getContext('2d').drawImage(img, sx, sy, s, s, 0, 0, s, s);
+      let canvas;
+      try {
+        canvas = document.createElement('canvas');
+        canvas.width = s; canvas.height = s;
+        canvas.getContext('2d').drawImage(img, sx, sy, s, s, 0, 0, s, s);
+      } catch {
+        cleanup();
+        resolveFn(false);
+        return toast('图片处理失败');
+      }
       canvas.toBlob((blob) => {
         if (!blob) { cleanup(); resolveFn(false); return toast('裁剪失败'); }
         cleanup();
@@ -1096,7 +1145,7 @@ function renderMoments() {
     card.className = 'moment-card';
     card.innerHTML = `
       <div class="moment-head">
-        <div class="avatar">${avatarOf(mo.author)}</div>
+        <div class="avatar"></div>
         <div>
           <div class="moment-author"></div>
           <div class="moment-time">${fmtTime(mo.at)}</div>
@@ -1108,7 +1157,7 @@ function renderMoments() {
         <span class="heart">❤️</span><span class="like-count"></span>
       </div>`;
     card.querySelector('.moment-author').textContent = mo.author;
-    // 作者头像
+    // 作者头像: 有 URL 用图, 没 URL 用首字
     const av = card.querySelector('.moment-head .avatar');
     const url = avatarUrl(mo.author);
     if (url) {
@@ -1116,6 +1165,8 @@ function renderMoments() {
       img.src = url;
       img.alt = '';
       av.appendChild(img);
+    } else {
+      av.textContent = avatarOf(mo.author);
     }
     if (mo.text) card.querySelector('.moment-text-body').textContent = mo.text;
     if (mo.images && mo.images.length) {
