@@ -198,7 +198,10 @@ function fmtTime(ts) {
 }
 
 function appendHistory(msgs) {
-  for (const m of msgs) renderMessage(m, true);
+  // DocumentFragment 批量插入, 100 条消息只触发 1 次重排
+  const frag = document.createDocumentFragment();
+  for (const m of msgs) renderMessage(m, true, frag);
+  $('msgList').appendChild(frag);
   scrollToBottom();
 }
 
@@ -232,7 +235,6 @@ function updatePeerAvatar() {
   const el = $('peerAvatar');
   el.innerHTML = '';
   const url = avatarUrl(peerName);
-  el.innerHTML = '';
   if (url) {
     const img = document.createElement('img');
     img.src = url;
@@ -241,17 +243,23 @@ function updatePeerAvatar() {
   } else {
     el.textContent = '?';
   }
+  // 通话界面同步头像
   $('callAvatar').innerHTML = '';
-  if (url) $('callAvatar').appendChild(el.firstChild.cloneNode());
+  if (url) {
+    const callImg = document.createElement('img');
+    callImg.src = url;
+    callImg.alt = '';
+    $('callAvatar').appendChild(callImg);
+  }
   // 设置面板里的我的头像预览
   const my = avatarUrl(myName);
   $('myAvatarPrev').style.backgroundImage = my ? `url('${my}')` : '';
   $('myAvatarPrev').style.backgroundSize = 'cover';
 }
 
-function renderMessage(m, isHistory = false) {
+function renderMessage(m, isHistory = false, container = null) {
   const mine = m.from === myName;
-  const list = $('msgList');
+  const parent = container || $('msgList');
   const row = document.createElement('div');
   row.className = 'msg ' + (mine ? 'mine' : 'peer');
 
@@ -317,7 +325,7 @@ function renderMessage(m, isHistory = false) {
 
   body.appendChild(bubble);
   row.appendChild(body);
-  list.appendChild(row);
+  parent.appendChild(row);
   // 已有头像直接显示图, 没头像时回退到首字(避免空白)
   const url = avatarUrl(m.from);
   if (url) {
@@ -358,7 +366,6 @@ function startRecording() {
   if (isRecording) return;
   navigator.mediaDevices.getUserMedia({ audio: true })
     .then((stream) => {
-      isRecording = true;
       recStream = stream;
       recChunks = [];
       recStart = Date.now();
@@ -370,6 +377,7 @@ function startRecording() {
         isRecording = false;
       };
       mediaRecorder.start();
+      isRecording = true; // start 成功后才标记, 避免异常时 UI 卡死
       $('recordingOverlay').classList.remove('hidden');
       $('recTimer').textContent = '0:00';
       recTimerRaf = requestAnimationFrame(tickRecTimer);
@@ -594,6 +602,8 @@ function tickCallTimer() {
 
 function endCall(reason) {
   if (callState === 'idle') return;
+  // 通知对方挂断(ICE 断开等场景之前漏发, 对方会卡在通话 UI)
+  send({ type: 'call', action: 'hangup' });
   callState = 'idle';
   callStartTime = 0; // 挂断后重置, 下次通话从 0 开始
   if (callTimerRaf) cancelAnimationFrame(callTimerRaf);
@@ -601,6 +611,7 @@ function endCall(reason) {
   if (pc) { pc.close(); pc = null; }
   if (localStream) { localStream.getTracks().forEach((t) => t.stop()); localStream = null; }
   if (remoteAudio) { remoteAudio.srcObject = null; remoteAudio = null; }
+  if (pendingIce) pendingIce.length = 0; // 清空旧候选, 避免泄漏到下次通话
   $('callOverlay').classList.add('hidden');
   $('callBtn').classList.remove('ringing');
   if (reason) toast(reason);
@@ -691,9 +702,13 @@ function sendText() {
   input.focus();
 }
 $('sendBtn').onclick = sendText;
+// typing 提示 2s debounce, 避免高频广播(首次按键立即发, 之后 2s 窗口内合并)
+let typingDebounce = null;
 $('textInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendText();
-  else send({ type: 'typing' });
+  if (e.key === 'Enter') { clearTimeout(typingDebounce); sendText(); return; }
+  if (!typingDebounce) send({ type: 'typing' });
+  clearTimeout(typingDebounce);
+  typingDebounce = setTimeout(() => { typingDebounce = null; }, 2000);
 });
 
 // 图片 / 文件(走 HTTP 上传, 聊天只传 URL)
@@ -701,7 +716,6 @@ $('imgBtn').onclick = () => $('imgPicker').click();
 $('fileBtn').onclick = () => $('filePicker').click();
 
 async function uploadFile(file) {
-  const fd = new FormData();
   const ext = (file.name.match(/\.[^.]+$/) || ['.bin'])[0];
   const resp = await fetch('/api/upload', {
     method: 'POST',
@@ -889,10 +903,7 @@ $('callReject').onclick = () => {
   send({ type: 'call', action: 'reject' });
   endCall('已拒绝');
 };
-$('callHangup').onclick = () => {
-  send({ type: 'call', action: 'hangup' });
-  endCall();
-};
+$('callHangup').onclick = () => endCall();
 
 // 返回
 $('backBtn').onclick = () => {

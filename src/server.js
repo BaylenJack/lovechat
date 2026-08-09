@@ -147,7 +147,8 @@ server.on('request', (req, res) => {
       });
       res.end(buf);
     });
-  } catch {
+  } catch (e) {
+    console.error('[http] 处理请求出错:', e);
     res.writeHead(500);
     res.end('server error');
   }
@@ -182,7 +183,8 @@ function broadcastPresence(roomId) {
 }
 
 function persistMessage(roomId, msg) {
-  const room = store.rooms[roomId] || (store.rooms[roomId] = { messages: [] });
+  const room = store.rooms[roomId] || (store.rooms[roomId] = { messages: [], users: {} });
+  if (!room.users) room.users = {}; // 兼容旧房间数据(恢复时无 users 字段)
   room.messages.push(msg);
   if (room.messages.length > MAX_HISTORY) room.messages.splice(0, room.messages.length - MAX_HISTORY);
   markDirty();
