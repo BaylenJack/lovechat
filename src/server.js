@@ -312,6 +312,7 @@ function handle(ws, msg) {
       const url = typeof msg.url === 'string' ? msg.url : '';
       if (!/^\/api\/file\/[\w.-]+$/.test(url)) return send(ws, 'error', { error: '文件地址不合法' });
       const room = store.rooms[roomId] || (store.rooms[roomId] = { messages: [], users: {} });
+      if (!room.users) room.users = {}; // 兼容旧房间数据(恢复时无 users 字段)
       room.users[info.name] = url;
       markDirty();
       broadcast(roomId, 'avatar', { name: info.name, url });
