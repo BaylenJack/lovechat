@@ -23,10 +23,10 @@ const store = { rooms: {} }; // roomId -> { messages: [], users: {} }
 try {
   if (fs.existsSync(DATA_FILE)) {
     Object.assign(store, JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')));
-    console.log(`[store] 已恢复 ${Object.keys(store.rooms).length} 个房间`);
+    console.log(`[store] Đã khôi phục ${Object.keys(store.rooms).length} phòng`);
   }
 } catch (e) {
-  console.error('[store] 存档损坏, 从空白开始:', e.message);
+  console.error('[store] Dữ liệu lưu trữ bị hỏng, bắt đầu lại:', e.message);
 }
 
 let saveTimer = null;
@@ -40,7 +40,7 @@ function markDirty() {
       fs.writeFileSync(tmp, JSON.stringify(store), 'utf8');
       fs.renameSync(tmp, DATA_FILE);
     } catch (e) {
-      console.error('[store] 写盘失败:', e.message);
+      console.error('[store] Không thể ghi dữ liệu:', e.message);
     }
   }, 400);
 }
@@ -50,7 +50,7 @@ function flushSync() {
   try {
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
     fs.writeFileSync(DATA_FILE, JSON.stringify(store), 'utf8');
-  } catch (e) { console.error('[store] 保存失败:', e.message); }
+  } catch (e) { console.error('[store] Lưu dữ liệu thất bại:', e.message); }
 }
 
 // ---------- HTTP 服务 ----------
@@ -148,7 +148,7 @@ server.on('request', (req, res) => {
       res.end(buf);
     });
   } catch (e) {
-    console.error('[http] 处理请求出错:', e);
+    console.error('[http] Lỗi xử lý yêu cầu:', e);
     res.writeHead(500);
     res.end('server error');
   }
@@ -191,7 +191,7 @@ function persistMessage(roomId, msg) {
 }
 
 const validToken = (t) => typeof t === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(t);
-const validRoom = (r) => typeof r === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(r);
+const validRoom = (r) => typeof r === 'string' && /^[\p{L}\p{N}_-]{1,32}$/u.test(r);
 
 // 密码哈希 — 只存哈希不存明文 (sha256(password + roomId))
 const hashPass = (pw, roomId) => createHash('sha256').update(pw + '@' + roomId).digest('hex');
@@ -203,9 +203,9 @@ wss.on('connection', (ws) => {
 
   ws.on('message', (raw) => {
     let msg;
-    try { msg = JSON.parse(raw.toString()); } catch { return send(ws, 'error', { error: '消息格式错误' }); }
+    try { msg = JSON.parse(raw.toString()); } catch { return send(ws, 'error', { error: 'Định dạng tin nhắn không hợp lệ' }); }
     if (!msg || typeof msg.type !== 'string') return;
-    try { handle(ws, msg); } catch (e) { console.error('[ws] 处理出错:', e); send(ws, 'error', { error: '服务器处理出错' }); }  });
+    try { handle(ws, msg); } catch (e) { console.error('[ws] Lỗi xử lý:', e); send(ws, 'error', { error: 'Máy chủ gặp lỗi khi xử lý' }); }  });
 
   ws.on('close', () => {
     const info = clients.get(ws);
@@ -224,14 +224,14 @@ function handle(ws, msg) {
   const info = clients.get(ws);
 
   if (msg.type === 'join') {
-    if (!validRoom(msg.roomId) || !validToken(msg.token)) return send(ws, 'error', { error: '参数不合法' });
+    if (!validRoom(msg.roomId) || !validToken(msg.token)) return send(ws, 'error', { error: 'Tham số không hợp lệ' });
     const roomId = msg.roomId;
-    const name = typeof msg.name === 'string' ? msg.name.slice(0, 16) || '对方' : '对方';
+    const name = typeof msg.name === 'string' ? msg.name.slice(0, 16) || 'Người ấy' : 'Người ấy';
     const room = store.rooms[roomId] || (store.rooms[roomId] = { messages: [], users: {} });
     // 房间密码: 首个进入者设置, 之后进入需验证
     const password = typeof msg.password === 'string' ? msg.password.trim() : '';
     if (room.passhash) {
-      if (!password || hashPass(password, roomId) !== room.passhash) return send(ws, 'error', { error: '密码错误' });
+      if (!password || hashPass(password, roomId) !== room.passhash) return send(ws, 'error', { error: 'Mật khẩu không đúng' });
     } else if (password) {
       room.passhash = hashPass(password, roomId);
       markDirty();
@@ -251,7 +251,7 @@ function handle(ws, msg) {
     return;
   }
 
-  if (!info.roomId) return send(ws, 'error', { error: '尚未加入房间' });
+  if (!info.roomId) return send(ws, 'error', { error: 'Bạn chưa tham gia phòng' });
   const roomId = info.roomId;
 
   switch (msg.type) {
@@ -268,7 +268,7 @@ function handle(ws, msg) {
       // msg: { kind: 'image'|'file'|'voice', name, url?, data?(base64, voice用), mime, duration? }
       const kind = ['image', 'file', 'voice'].includes(msg.kind) ? msg.kind : 'file';
       if (typeof msg.url === 'string') {
-        if (!/^\/api\/file\/[\w.-]+$/.test(msg.url)) return send(ws, 'error', { error: '文件地址不合法' });
+        if (!/^\/api\/file\/[\w.-]+$/.test(msg.url)) return send(ws, 'error', { error: 'Địa chỉ tệp không hợp lệ' });
         const m = {
           id: uuidv4(), kind,
           name: typeof msg.name === 'string' ? msg.name.slice(0, 128) : 'file',
@@ -282,7 +282,7 @@ function handle(ws, msg) {
         break;
       }
       // 旧格式/语音条: base64 data
-      if (typeof msg.data !== 'string' || msg.data.length > 2 * 1024 * 1024) return send(ws, 'error', { error: '文件过大' });
+      if (typeof msg.data !== 'string' || msg.data.length > 2 * 1024 * 1024) return send(ws, 'error', { error: 'Tệp quá lớn' });
       const m = {
         id: uuidv4(), kind,
         name: typeof msg.name === 'string' ? msg.name.slice(0, 128) : 'file',
@@ -312,7 +312,7 @@ function handle(ws, msg) {
     case 'setAvatar': {
       // 换头像: url 复用 /api/file/ 上传结果, 房间内广播
       const url = typeof msg.url === 'string' ? msg.url : '';
-      if (!/^\/api\/file\/[\w.-]+$/.test(url)) return send(ws, 'error', { error: '文件地址不合法' });
+      if (!/^\/api\/file\/[\w.-]+$/.test(url)) return send(ws, 'error', { error: 'Địa chỉ tệp không hợp lệ' });
       const room = store.rooms[roomId] || (store.rooms[roomId] = { messages: [], users: {} });
       if (!room.users) room.users = {}; // 兼容旧房间数据(恢复时无 users 字段)
       room.users[info.name] = url;
@@ -360,7 +360,7 @@ function handle(ws, msg) {
       break;
 
     default:
-      send(ws, 'error', { error: '未知指令' });
+      send(ws, 'error', { error: 'Lệnh không xác định' });
   }
 }
 
@@ -375,7 +375,7 @@ const heartbeat = setInterval(() => {
 
 // 优雅退出
 function shutdown(sig) {
-  console.log(`[server] ${sig}, 保存退出...`);
+  console.log(`[server] ${sig}, đang lưu và thoát...`);
   clearInterval(heartbeat);
   flushSync();
   for (const ws of wss.clients) { try { ws.close(1001, 'restart'); } catch {} }
@@ -387,6 +387,6 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('uncaughtException', (e) => { console.error(e); try { flushSync(); } catch {} process.exit(1); });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[server] lovechat 已启动 http://0.0.0.0:${PORT}`);
-  console.log(`[server] 存档: ${DATA_FILE}`);
+  console.log(`[server] lovechat đã khởi động tại http://0.0.0.0:${PORT}`);
+  console.log(`[server] Dữ liệu: ${DATA_FILE}`);
 });

@@ -22,7 +22,7 @@ const TOKEN = getToken();
 let ws = null;
 let myName = '';
 let roomId = '';
-let peerName = '对方';
+let peerName = 'Người ấy';
 let online = [];
 let avatars = {}; // name -> avatar url
 let moments = []; // 动态列表
@@ -68,7 +68,7 @@ function wsURL() {
 function connect() {
   clearTimeout(reconnectTimer);
   manualClose = false;
-  setStatus('连接中…');
+  setStatus('Đang kết nối…');
 
   try { ws = new WebSocket(wsURL()); }
   catch { return scheduleReconnect(); }
@@ -91,7 +91,7 @@ function connect() {
 
   ws.onclose = () => {
     if (manualClose) return;
-    setStatus('连接断开，重连中…');
+    setStatus('Mất kết nối, đang kết nối lại…');
     scheduleReconnect();
   };
   ws.onerror = () => {};
@@ -105,13 +105,13 @@ function scheduleReconnect() {
 }
 
 function send(obj) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return toast('还没连上');
-  try { ws.send(JSON.stringify(obj)); } catch { toast('发送失败'); }
+  if (!ws || ws.readyState !== WebSocket.OPEN) return toast('Chưa kết nối');
+  try { ws.send(JSON.stringify(obj)); } catch { toast('Gửi thất bại'); }
 }
 
 function setStatus(text) {
   $('peerStatus').textContent = text;
-  $('peerStatus').classList.toggle('online', text.includes('在线'));
+  $('peerStatus').classList.toggle('online', text.includes('Trực tuyến'));
 }
 
 // ================= 消息处理 =================
@@ -124,7 +124,7 @@ function handle(m) {
       if (m.name) peerName = m.name;
       $('peerName').textContent = peerName;
       updatePeerAvatar();
-      setStatus('在线');
+      setStatus('Trực tuyến');
       break;
 
     case 'message':
@@ -136,13 +136,13 @@ function handle(m) {
       const hadOnline = online.length > 0;
       online = m.online || [];
       const meOnline = online.includes(myName);
-      setStatus(meOnline && online.length >= 2 ? '在线' : '离线');
-      if (hadOnline && online.length < 2) toast('对方已离线');
+      setStatus(meOnline && online.length >= 2 ? 'Trực tuyến' : 'Ngoại tuyến');
+      if (hadOnline && online.length < 2) toast('Người ấy đã ngoại tuyến');
       break;
     }
 
     case 'typing':
-      if (m.from !== myName) { setStatus(`${m.from} 正在输入…`); setTimeout(() => setStatus('在线'), 1500); }
+      if (m.from !== myName) { setStatus(`${m.from} đang nhập…`); setTimeout(() => setStatus('Trực tuyến'), 1500); }
       break;
 
     case 'avatar':
@@ -171,8 +171,8 @@ function handle(m) {
 
     case 'error':
       console.warn('[ws error]', m.error, m); // 定位服务器错误来源
-      toast(m.error || '出错了');
-      if (m.error === '密码错误') {
+      toast(m.error || 'Đã xảy ra lỗi');
+      if (m.error === 'Mật khẩu không đúng') {
         // 密码不对, 关掉连接回大厅重试(避免僵尸连接)
         manualClose = true;
         if (ws) { try { ws.close(); } catch {} }
@@ -285,7 +285,7 @@ function renderMessage(m, isHistory = false, container = null) {
     bubble.classList.add('image');
     const img = document.createElement('img');
     img.src = m.url || ('data:' + (m.mime || 'image/png') + ';base64,' + (m.data || ''));
-    img.alt = m.name || '图片';
+    img.alt = m.name || 'Hình ảnh';
     img.loading = 'lazy';
     img.onclick = () => showImagePreview(img.src);
     bubble.appendChild(img);
@@ -301,7 +301,7 @@ function renderMessage(m, isHistory = false, container = null) {
       if (a) {
         bubble.classList.add('playing');
         a.onended = () => bubble.classList.remove('playing');
-        a.onerror = () => { bubble.classList.remove('playing'); toast('语音播放失败'); };
+        a.onerror = () => { bubble.classList.remove('playing'); toast('Không thể phát tin nhắn thoại'); };
       }
     };
     // 我的新语音(刚发出去的)自动播放 — 本地播放不依赖对端
@@ -313,7 +313,7 @@ function renderMessage(m, isHistory = false, container = null) {
   } else if (m.kind === 'file') {
     bubble.classList.add('file');
     bubble.innerHTML = `<span class="f-icon">📄</span><span class="f-name"></span>`;
-    bubble.querySelector('.f-name').textContent = m.name || '文件';
+    bubble.querySelector('.f-name').textContent = m.name || 'Tệp';
     bubble.onclick = () => {
       if (m.url) { window.open(m.url, '_blank'); return; }
       const a = document.createElement('a');
@@ -382,7 +382,7 @@ function startRecording() {
       $('recTimer').textContent = '0:00';
       recTimerRaf = requestAnimationFrame(tickRecTimer);
     })
-    .catch(() => toast('无法访问麦克风'));
+    .catch(() => toast('Không thể truy cập micro'));
 }
 
 function tickRecTimer() {
@@ -406,13 +406,13 @@ function stopRecording(sendIt = true) {
     const dur = Math.max(1, Math.round((Date.now() - recStart) / 1000));
     const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
     // 语音走 HTTP 上传(服务端流式播放), 不再整包 base64 走 WS
-    toast('上传语音…');
+    toast('Đang tải tin nhắn thoại…');
     uploadFile(new File([blob], 'voice.webm', { type: blob.type }))
       .then((url) => {
         send({ type: 'file', kind: 'voice', name: 'voice.webm', url, mime: blob.type || 'audio/webm', duration: dur });
         if (autoPlayVoice) playVoice({ url, mime: blob.type || 'audio/webm' }, true);
       })
-      .catch(() => toast('语音上传失败'));
+      .catch(() => toast('Tải tin nhắn thoại thất bại'));
   };
   mediaRecorder.stop();
 }
@@ -460,7 +460,7 @@ async function createPeer() {
         showCallUI('reconnecting', peerName);
         restartIce();
       } else if (s === 'failed') {
-        endCall('通话中断');
+        endCall('Cuộc gọi bị gián đoạn');
       }
     } else if (s === 'connected' || s === 'completed') {
       iceRestartCount = 0; // 重置重试计数
@@ -469,7 +469,7 @@ async function createPeer() {
   };
   pc.onconnectionstatechange = () => {
     if (pc && ['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
-      endCall('通话中断');
+      endCall('Cuộc gọi bị gián đoạn');
     }
   };
   return pc;
@@ -481,7 +481,7 @@ async function restartIce() {
     await pc.setLocalDescription(offer);
     send({ type: 'signal', signal: { type: 'offer', sdp: pc.localDescription, restart: true } });
   } catch (e) {
-    endCall('重连失败');
+    endCall('Kết nối lại thất bại');
   }
 }
 
@@ -532,7 +532,7 @@ async function startCall() {
     ensureAudioContext(); // 安卓 Chrome 必须, 否则发出的轨道无声
     localStream.getAudioTracks().forEach((t) => { t.enabled = true; });
   } catch {
-    return toast('无法访问麦克风');
+    return toast('Không thể truy cập micro');
   }
   callState = 'calling';
   iceRestartCount = 0;
@@ -562,27 +562,27 @@ async function handleCall(from, action) {
     showCallUI('ringing', from);
     $('callBtn').classList.add('ringing');
   } else if (action === 'busy') {
-    endCall(from + ' 忙线中');
+    endCall(from + ' đang bận');
   } else if (action === 'accept') {
     if (callState === 'calling') {
       callState = 'talking';
       showCallUI('talking', peerName);
     }
   } else if (action === 'reject') {
-    endCall('对方拒绝了通话');
+    endCall('Người ấy đã từ chối cuộc gọi');
   } else if (action === 'hangup') {
-    endCall('通话已结束');
+    endCall('Cuộc gọi đã kết thúc');
   }
 }
 
 function showCallUI(mode, name) {
   $('callOverlay').classList.remove('hidden');
-  $('callTitle').textContent = mode === 'talking' ? `${name} 通话中` : name;
+  $('callTitle').textContent = mode === 'talking' ? `Đang gọi với ${name}` : name;
   $('callStatus').textContent =
-    mode === 'calling' ? '等待对方接听…' :
-    mode === 'ringing' ? '邀请你语音通话…' :
-    mode === 'talking' ? '通话时长 0:00' :
-    mode === 'reconnecting' ? '重新连接中…' : '';
+    mode === 'calling' ? 'Đang chờ người ấy trả lời…' :
+    mode === 'ringing' ? 'Đang mời bạn vào cuộc gọi thoại…' :
+    mode === 'talking' ? 'Thời lượng 0:00' :
+    mode === 'reconnecting' ? 'Đang kết nối lại…' : '';
   $('callReject').classList.toggle('hidden', mode === 'talking' || mode === 'reconnecting');
   $('callAccept').classList.toggle('hidden', mode !== 'ringing');
   $('callHangup').classList.toggle('hidden', mode === 'ringing' || mode === 'idle');
@@ -596,7 +596,7 @@ function showCallUI(mode, name) {
 function tickCallTimer() {
   if (callState !== 'talking') return;
   const sec = Math.floor((Date.now() - callStartTime) / 1000);
-  $('callStatus').textContent = `通话时长 ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  $('callStatus').textContent = `Thời lượng ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
   callTimerRaf = requestAnimationFrame(tickCallTimer);
 }
 
@@ -619,13 +619,13 @@ function endCall(reason) {
 
 async function acceptCall() {
   if (callState !== 'ringing') return;
-  if (!pendingOffer) { toast('连接未就绪，请重试'); return; }
+  if (!pendingOffer) { toast('Kết nối chưa sẵn sàng, vui lòng thử lại'); return; }
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
     ensureAudioContext(); // 安卓 Chrome 必须, 否则发出的轨道无声
     localStream.getAudioTracks().forEach((t) => { t.enabled = true; });
   } catch {
-    return toast('无法访问麦克风');
+    return toast('Không thể truy cập micro');
   }
   callState = 'talking';
   iceRestartCount = 0;
@@ -635,7 +635,7 @@ async function acceptCall() {
   try {
     await pc.setRemoteDescription(pendingOffer.sdp);
   } catch {
-    endCall('连接失败');
+    endCall('Kết nối thất bại');
     return;
   }
   pendingOffer = null;
@@ -661,9 +661,9 @@ async function handleSignal(from, signal) {
           await pc.setLocalDescription(answer);
           send({ type: 'signal', signal: { type: 'answer', sdp: pc.localDescription } });
           showCallUI('reconnecting', peerName);
-          toast('重新连接中…');
+          toast('Đang kết nối lại…');
         } catch (e) {
-          endCall('重连失败');
+          endCall('Kết nối lại thất bại');
         }
       }
     } else if (callState === 'ringing') {
@@ -729,8 +729,8 @@ async function uploadFile(file) {
 
 async function readAndSend(file, kind) {
   if (!file) return;
-  if (file.size > 8 * 1024 * 1024) return toast('文件不能超过 8MB');
-  toast('上传中…');
+  if (file.size > 8 * 1024 * 1024) return toast('Tệp không được vượt quá 8 MB');
+  toast('Đang tải lên…');
   try {
     let toUpload = file;
     if (kind === 'image' && file.type.startsWith('image/')) {
@@ -745,7 +745,7 @@ async function readAndSend(file, kind) {
       mime: toUpload.type || 'application/octet-stream',
     });
   } catch {
-    toast('上传失败');
+    toast('Tải lên thất bại');
   }
 }
 
@@ -901,7 +901,7 @@ $('callAccept').onclick = () => {
 };
 $('callReject').onclick = () => {
   send({ type: 'call', action: 'reject' });
-  endCall('已拒绝');
+  endCall('Đã từ chối');
 };
 $('callHangup').onclick = () => endCall();
 
@@ -922,7 +922,7 @@ $('avatarPicker').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f) return;
-  if (!f.type.startsWith('image/')) return toast('请选择图片');
+  if (!f.type.startsWith('image/')) return toast('Vui lòng chọn một hình ảnh');
   try {
     // 裁剪器: 微信式正方形选区, 可拖动/缩放
     const cropped = await openCropper(f);
@@ -930,9 +930,9 @@ $('avatarPicker').addEventListener('change', async (e) => {
     const small = await compressToSquare(cropped, 320);
     const url = await uploadFile(small);
     send({ type: 'setAvatar', url });
-    toast('头像已更新');
+    toast('Đã cập nhật ảnh đại diện');
   } catch {
-    toast('头像上传失败');
+    toast('Tải ảnh đại diện thất bại');
   }
 });
 
@@ -1070,13 +1070,13 @@ function openCropper(file) {
         try {
           c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         } catch {
-          toast('图片过大，处理失败');
+          toast('Hình ảnh quá lớn, không thể xử lý');
           cleanup();
           resolveFn(false);
           return;
         }
         c.toBlob((blob) => {
-          if (!blob) { toast('图片处理失败'); cleanup(); resolveFn(false); return; }
+          if (!blob) { toast('Xử lý hình ảnh thất bại'); cleanup(); resolveFn(false); return; }
           img.src = URL.createObjectURL(blob); // 重新触发 onload, 走正常 fit()
         }, 'image/jpeg', 0.9);
         return;
@@ -1085,7 +1085,7 @@ function openCropper(file) {
       confirmBtn.disabled = false;
     };
     img.onerror = () => {
-      toast('图片加载失败，请换一张');
+      toast('Không thể tải hình ảnh, vui lòng chọn ảnh khác');
       cleanup();
       resolveFn(false);
     };
@@ -1094,7 +1094,7 @@ function openCropper(file) {
     $('cropCancel').onclick = () => { cleanup(); resolveFn(false); };
     $('cropConfirm').onclick = () => {
       const { sx, sy, s } = cropRect();
-      if (s < 8) return toast('选区太小');
+      if (s < 8) return toast('Vùng chọn quá nhỏ');
       let canvas;
       try {
         canvas = document.createElement('canvas');
@@ -1103,10 +1103,10 @@ function openCropper(file) {
       } catch {
         cleanup();
         resolveFn(false);
-        return toast('图片处理失败');
+        return toast('Xử lý hình ảnh thất bại');
       }
       canvas.toBlob((blob) => {
-        if (!blob) { cleanup(); resolveFn(false); return toast('裁剪失败'); }
+        if (!blob) { cleanup(); resolveFn(false); return toast('Cắt ảnh thất bại'); }
         cleanup();
         resolveFn(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }));
       }, 'image/jpeg', 0.9);
@@ -1118,14 +1118,14 @@ $('bgPicker').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f) return;
-  toast('上传背景中…');
+  toast('Đang tải hình nền…');
   try {
     const small = await compressImage(f);
     const url = await uploadFile(small);
     localStorage.setItem('lovechat.bg', url);
     applyBg();
   } catch {
-    toast('背景上传失败');
+    toast('Tải hình nền thất bại');
   }
 });
 $('resetBgBtn').onclick = () => {
@@ -1192,7 +1192,7 @@ function renderMoments() {
         grid.appendChild(img);
       }
     }
-    card.querySelector('.like-count').textContent = mo.likes && mo.likes.length ? mo.likes.length : '点赞';
+    card.querySelector('.like-count').textContent = mo.likes && mo.likes.length ? mo.likes.length : 'Thích';
     card.querySelector('.moment-like').onclick = () => send({ type: 'momentLike', id: mo.id });
     list.appendChild(card);
   }
@@ -1204,7 +1204,7 @@ $('momentPicker').addEventListener('change', async (e) => {
   const files = [...e.target.files].slice(0, 4 - momentImages.length);
   e.target.value = '';
   if (!files.length) return;
-  toast('上传图片中…');
+  toast('Đang tải hình ảnh…');
   for (const f of files) {
     try {
       const small = await compressImage(f);
@@ -1212,7 +1212,7 @@ $('momentPicker').addEventListener('change', async (e) => {
       momentImages.push(url);
       renderMomentPics();
     } catch {
-      toast('图片上传失败');
+      toast('Tải hình ảnh thất bại');
     }
   }
 });
@@ -1234,7 +1234,7 @@ function renderMomentPics() {
 }
 $('momentSend').onclick = () => {
   const text = $('momentText').value.trim();
-  if (!text && !momentImages.length) return toast('写点内容或加张图吧');
+  if (!text && !momentImages.length) return toast('Hãy viết vài dòng hoặc thêm một hình ảnh');
   send({ type: 'moment', text, images: momentImages });
   $('momentText').value = '';
   momentImages = [];
@@ -1243,10 +1243,10 @@ $('momentSend').onclick = () => {
 
 // ================= 入口 =================
 function enter() {
-  const name = $('nameInput').value.trim() || '对方';
+  const name = $('nameInput').value.trim() || 'Người ấy';
   const room = $('roomInput').value.trim();
-  if (!room) { toast('请填写房间名'); return; }
-  if (!/^[A-Za-z0-9_一-龥-]{1,32}$/.test(room)) { toast('房间名不合法'); return; }
+  if (!room) { toast('Vui lòng nhập tên phòng'); return; }
+  if (!/^[\p{L}\p{N}_-]{1,32}$/u.test(room)) { toast('Tên phòng không hợp lệ'); return; }
   myName = name;
   roomId = /^[A-Za-z0-9_-]+$/.test(room) ? room : hashRoom(room);
   localStorage.setItem('lovechat.name', myName);

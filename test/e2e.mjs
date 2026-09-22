@@ -118,7 +118,7 @@ const c = new C('lctokenCCCC333333');
 await c.conn(); c.wire();
 c.send({ type: 'join', roomId: '../bad', token: 'lctokenCCCC333333' });
 const bad = await c.wait((m) => m.type === 'error');
-ok(/参数不合法/.test(bad.error), '非法房间名被拒');
+ok(/Tham số không hợp lệ/.test(bad.error), '非法房间名被拒');
 
 c.send({ type: 'chat', text: '' });
 ok(true, '空消息被忽略(无异常)');
@@ -135,7 +135,7 @@ const p2 = new C('lctokenPWD222222');
 await p2.conn(); p2.wire();
 p2.send({ type: 'join', roomId: ROOM_PW, token: p2.tok, name: '宝贝' });
 const p2Bad = await p2.wait((m) => m.type === 'error');
-ok(/密码错误/.test(p2Bad.error), '无密码被拒');
+ok(/Mật khẩu không đúng/.test(p2Bad.error), '无密码被拒');
 
 p2.send({ type: 'join', roomId: ROOM_PW, token: p2.tok, name: '宝贝', password: 'wrong' });
 await p2.wait((m) => m.type === 'error');
@@ -172,7 +172,14 @@ const j3 = await a3.wait((m) => m.type === 'joined');
 ok(j3.avatars && j3.avatars['阿巢'] === '/api/file/abc123.png', '重连后 joined 带头像映射');
 ok(Array.isArray(j3.moments) && j3.moments.length >= 1, 'joined 带动态列表');
 
-p1.close(); p2.close(); a3.close();
+console.log('\n[13] 越南语房间名');
+const vi = new C('lctokenVIET333333');
+await vi.conn(); vi.wire();
+vi.send({ type: 'join', roomId: 'PhòngTìnhYêu', token: vi.tok, name: 'Minh' });
+const viJoined = await vi.wait((m) => m.type === 'joined');
+ok(viJoined.name === 'Minh', '支持带越南语重音字符的房间名');
+
+p1.close(); p2.close(); a3.close(); vi.close();
 a2.close(); b.close(); c.close();
 await sleep(200);
 console.log(`\n结果: ${pass} 通过, ${fail} 失败\n`);

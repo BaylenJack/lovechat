@@ -1,5 +1,7 @@
 # ☕ 我们的客厅 (LoveChat)
 
+[Tiếng Việt](README.vi.md)
+
 > 一个像微信聊天界面一样的双人实时通信应用 —— 文字、语音条、图片、文件、语音通话。
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

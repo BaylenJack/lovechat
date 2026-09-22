@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node test/e2e.mjs"
   },
   "dependencies": {
     "uuid": "^14.0.1",
