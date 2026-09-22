@@ -179,6 +179,15 @@ vi.send({ type: 'join', roomId: 'PhòngTìnhYêu', token: vi.tok, name: 'Minh' }
 const viJoined = await vi.wait((m) => m.type === 'joined');
 ok(viJoined.name === 'Minh', '支持带越南语重音字符的房间名');
 
+console.log('\n[14] 三语界面');
+const httpURL = URL.replace(/^ws/, 'http').replace(/\/$/, '');
+const pageHTML = await fetch(httpURL + '/').then((r) => r.text());
+const appJS = await fetch(httpURL + '/app.js?v=6-i18n').then((r) => r.text());
+ok(pageHTML.includes('<html lang="en">'), '默认语言为英语');
+ok(['en', 'zh', 'vi'].every((lang) => pageHTML.includes(`data-language="${lang}"`)), '提供英语、中文和越南语切换');
+ok(['en:', 'zh:', 'vi:'].every((marker) => appJS.includes(marker)), '三套语言字典均已加载');
+ok(appJS.includes("localStorage.setItem('lovechat.lang'"), '记住用户的语言选择');
+
 p1.close(); p2.close(); a3.close(); vi.close();
 a2.close(); b.close(); c.close();
 await sleep(200);

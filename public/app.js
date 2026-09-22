@@ -5,6 +5,156 @@
 
 const $ = (id) => document.getElementById(id);
 
+// ---------- 多语言 ----------
+const I18N = {
+  en: {
+    pageTitle: 'lovechat — A space for two', brandSub: 'A private space for two',
+    nameLabel: 'Your name', namePlaceholder: 'Enter your name', roomLabel: 'Room name',
+    roomPlaceholder: 'Use the same room name', passwordLabel: 'Room password',
+    passwordPlaceholder: 'Create or enter the room password', enterRoom: 'Enter room →',
+    lobbyHint: 'Share the same room name and password to start chatting.', partner: 'Your partner',
+    statusConnecting: 'Connecting…', statusReconnecting: 'Connection lost, reconnecting…',
+    statusOnline: 'Online', statusOffline: 'Offline', statusTyping: '{name} is typing…',
+    moments: 'Moments', settings: 'Settings', voiceCall: 'Voice call', startChat: 'Start the conversation',
+    momentPlaceholder: 'What would you like to share?', addPhoto: 'Add photo', post: 'Post',
+    holdToTalk: 'Hold to talk', sendImage: 'Send image', sendFile: 'Send file', emoji: 'Emoji',
+    messagePlaceholder: 'Type a message…', send: 'Send',
+    releaseToSend: 'Release to send · Swipe up to cancel', calling: 'Calling…',
+    myAvatar: 'My avatar', avatarSub: 'Your partner will see the new avatar too', change: 'Change',
+    chatBackground: 'Chat background', backgroundSub: 'Only visible to you', default: 'Default',
+    close: 'Close', cropTitle: 'Adjust avatar', cropHint: 'Drag to move · Drag the corner to resize',
+    cancel: 'Cancel', confirm: 'Confirm', notConnected: 'Not connected', sendFailed: 'Failed to send',
+    partnerOffline: 'Your partner went offline', genericError: 'Something went wrong', image: 'Image',
+    voicePlaybackFailed: 'Unable to play the voice message', file: 'File', microphoneDenied: 'Microphone access is unavailable',
+    uploadingVoice: 'Uploading voice message…', voiceUploadFailed: 'Voice message upload failed',
+    callInterrupted: 'Call disconnected', reconnectFailed: 'Reconnection failed', busy: '{name} is busy',
+    callDeclined: 'Your partner declined the call', callEnded: 'Call ended', callWith: 'Call with {name}',
+    waitingAnswer: 'Waiting for your partner to answer…', incomingCall: 'Incoming voice call…',
+    duration: 'Duration {time}', callNotReady: 'Connection is not ready. Please try again.',
+    connectionFailed: 'Connection failed', rejected: 'Declined', fileTooLarge: 'Files must not exceed 8 MB',
+    uploading: 'Uploading…', uploadFailed: 'Upload failed', chooseImage: 'Please select an image',
+    avatarUpdated: 'Avatar updated', avatarUploadFailed: 'Avatar upload failed',
+    imageTooLarge: 'The image is too large to process', imageProcessFailed: 'Image processing failed',
+    imageLoadFailed: 'Unable to load the image. Please choose another one.', selectionTooSmall: 'The selected area is too small',
+    cropFailed: 'Image cropping failed', uploadingBackground: 'Uploading background…',
+    backgroundUploadFailed: 'Background upload failed', like: 'Like', uploadingImages: 'Uploading images…',
+    imageUploadFailed: 'Image upload failed', momentEmpty: 'Write something or add a photo',
+    roomRequired: 'Please enter a room name', invalidRoom: 'Invalid room name', wrongPassword: 'Incorrect password',
+    invalidMessage: 'Invalid message format', serverProcessingError: 'The server could not process the request',
+    invalidParams: 'Invalid parameters', notInRoom: 'You have not joined a room', invalidFileUrl: 'Invalid file address',
+    serverFileTooLarge: 'The file is too large', unknownCommand: 'Unknown command',
+  },
+  zh: {
+    pageTitle: 'lovechat — 两个人的私密空间', brandSub: '两个人的私密空间',
+    nameLabel: '你的名字', namePlaceholder: '请输入你的名字', roomLabel: '房间名',
+    roomPlaceholder: '双方使用相同的房间名', passwordLabel: '房间密码',
+    passwordPlaceholder: '设置新密码或输入已有密码', enterRoom: '进入房间 →',
+    lobbyHint: '分享相同的房间名和密码，即可开始聊天。', partner: '对方',
+    statusConnecting: '正在连接…', statusReconnecting: '连接已断开，正在重连…',
+    statusOnline: '在线', statusOffline: '离线', statusTyping: '{name} 正在输入…',
+    moments: '动态', settings: '设置', voiceCall: '语音通话', startChat: '开始聊天吧',
+    momentPlaceholder: '想分享些什么…', addPhoto: '添加图片', post: '发布',
+    holdToTalk: '按住说话', sendImage: '发送图片', sendFile: '发送文件', emoji: '表情',
+    messagePlaceholder: '输入消息…', send: '发送', releaseToSend: '松开发送 · 上滑取消', calling: '正在呼叫…',
+    myAvatar: '我的头像', avatarSub: '对方也会看到新头像', change: '更换',
+    chatBackground: '聊天背景', backgroundSub: '仅自己可见', default: '默认', close: '关闭',
+    cropTitle: '调整头像', cropHint: '拖动选区 · 拖动角落调整大小', cancel: '取消', confirm: '确定',
+    notConnected: '尚未连接', sendFailed: '发送失败', partnerOffline: '对方已离线',
+    genericError: '发生错误', image: '图片', voicePlaybackFailed: '无法播放语音消息', file: '文件',
+    microphoneDenied: '无法访问麦克风', uploadingVoice: '正在上传语音消息…',
+    voiceUploadFailed: '语音消息上传失败', callInterrupted: '通话连接中断', reconnectFailed: '重新连接失败',
+    busy: '{name} 正在通话中', callDeclined: '对方拒绝了通话', callEnded: '通话已结束',
+    callWith: '正在与 {name} 通话', waitingAnswer: '等待对方接听…', incomingCall: '邀请你进行语音通话…',
+    duration: '通话时长 {time}', callNotReady: '连接尚未准备好，请重试', connectionFailed: '连接失败',
+    rejected: '已拒绝', fileTooLarge: '文件不能超过 8 MB', uploading: '正在上传…', uploadFailed: '上传失败',
+    chooseImage: '请选择图片', avatarUpdated: '头像已更新', avatarUploadFailed: '头像上传失败',
+    imageTooLarge: '图片过大，无法处理', imageProcessFailed: '图片处理失败',
+    imageLoadFailed: '无法加载图片，请选择其他图片', selectionTooSmall: '选区过小', cropFailed: '图片裁剪失败',
+    uploadingBackground: '正在上传背景…', backgroundUploadFailed: '背景上传失败', like: '点赞',
+    uploadingImages: '正在上传图片…', imageUploadFailed: '图片上传失败', momentEmpty: '写点内容或添加一张图片吧',
+    roomRequired: '请输入房间名', invalidRoom: '房间名不合法', wrongPassword: '密码错误',
+    invalidMessage: '消息格式无效', serverProcessingError: '服务器处理请求时发生错误',
+    invalidParams: '参数无效', notInRoom: '你尚未加入房间', invalidFileUrl: '文件地址无效',
+    serverFileTooLarge: '文件过大', unknownCommand: '未知指令',
+  },
+  vi: {
+    pageTitle: 'lovechat — Không gian của hai người', brandSub: 'Không gian riêng dành cho hai người',
+    nameLabel: 'Tên của bạn', namePlaceholder: 'Nhập tên của bạn', roomLabel: 'Tên phòng',
+    roomPlaceholder: 'Hai bạn dùng cùng một tên phòng', passwordLabel: 'Mật khẩu phòng',
+    passwordPlaceholder: 'Đặt mới hoặc nhập mật khẩu hiện có', enterRoom: 'Vào phòng →',
+    lobbyHint: 'Chia sẻ cùng tên phòng và mật khẩu để bắt đầu trò chuyện.', partner: 'Người ấy',
+    statusConnecting: 'Đang kết nối…', statusReconnecting: 'Mất kết nối, đang kết nối lại…',
+    statusOnline: 'Trực tuyến', statusOffline: 'Ngoại tuyến', statusTyping: '{name} đang nhập…',
+    moments: 'Khoảnh khắc', settings: 'Cài đặt', voiceCall: 'Cuộc gọi thoại', startChat: 'Hãy bắt đầu trò chuyện',
+    momentPlaceholder: 'Bạn muốn chia sẻ điều gì…', addPhoto: 'Thêm ảnh', post: 'Đăng',
+    holdToTalk: 'Giữ để nói', sendImage: 'Gửi ảnh', sendFile: 'Gửi tệp', emoji: 'Biểu tượng cảm xúc',
+    messagePlaceholder: 'Nhập tin nhắn…', send: 'Gửi', releaseToSend: 'Thả để gửi · Vuốt lên để hủy',
+    calling: 'Đang gọi…', myAvatar: 'Ảnh đại diện của tôi', avatarSub: 'Người ấy cũng sẽ thấy ảnh mới',
+    change: 'Thay đổi', chatBackground: 'Hình nền trò chuyện', backgroundSub: 'Chỉ hiển thị với bạn',
+    default: 'Mặc định', close: 'Đóng', cropTitle: 'Điều chỉnh ảnh đại diện',
+    cropHint: 'Kéo để di chuyển · Kéo góc để đổi kích thước', cancel: 'Hủy', confirm: 'Xác nhận',
+    notConnected: 'Chưa kết nối', sendFailed: 'Gửi thất bại', partnerOffline: 'Người ấy đã ngoại tuyến',
+    genericError: 'Đã xảy ra lỗi', image: 'Hình ảnh', voicePlaybackFailed: 'Không thể phát tin nhắn thoại', file: 'Tệp',
+    microphoneDenied: 'Không thể truy cập micro', uploadingVoice: 'Đang tải tin nhắn thoại…',
+    voiceUploadFailed: 'Tải tin nhắn thoại thất bại', callInterrupted: 'Cuộc gọi bị gián đoạn',
+    reconnectFailed: 'Kết nối lại thất bại', busy: '{name} đang bận', callDeclined: 'Người ấy đã từ chối cuộc gọi',
+    callEnded: 'Cuộc gọi đã kết thúc', callWith: 'Đang gọi với {name}', waitingAnswer: 'Đang chờ người ấy trả lời…',
+    incomingCall: 'Đang mời bạn vào cuộc gọi thoại…', duration: 'Thời lượng {time}',
+    callNotReady: 'Kết nối chưa sẵn sàng, vui lòng thử lại', connectionFailed: 'Kết nối thất bại',
+    rejected: 'Đã từ chối', fileTooLarge: 'Tệp không được vượt quá 8 MB', uploading: 'Đang tải lên…',
+    uploadFailed: 'Tải lên thất bại', chooseImage: 'Vui lòng chọn một hình ảnh', avatarUpdated: 'Đã cập nhật ảnh đại diện',
+    avatarUploadFailed: 'Tải ảnh đại diện thất bại', imageTooLarge: 'Hình ảnh quá lớn, không thể xử lý',
+    imageProcessFailed: 'Xử lý hình ảnh thất bại', imageLoadFailed: 'Không thể tải hình ảnh, vui lòng chọn ảnh khác',
+    selectionTooSmall: 'Vùng chọn quá nhỏ', cropFailed: 'Cắt ảnh thất bại', uploadingBackground: 'Đang tải hình nền…',
+    backgroundUploadFailed: 'Tải hình nền thất bại', like: 'Thích', uploadingImages: 'Đang tải hình ảnh…',
+    imageUploadFailed: 'Tải hình ảnh thất bại', momentEmpty: 'Hãy viết vài dòng hoặc thêm một hình ảnh',
+    roomRequired: 'Vui lòng nhập tên phòng', invalidRoom: 'Tên phòng không hợp lệ', wrongPassword: 'Mật khẩu không đúng',
+    invalidMessage: 'Định dạng tin nhắn không hợp lệ', serverProcessingError: 'Máy chủ gặp lỗi khi xử lý',
+    invalidParams: 'Tham số không hợp lệ', notInRoom: 'Bạn chưa tham gia phòng',
+    invalidFileUrl: 'Địa chỉ tệp không hợp lệ', serverFileTooLarge: 'Tệp quá lớn', unknownCommand: 'Lệnh không xác định',
+  },
+};
+
+const SUPPORTED_LANGUAGES = ['en', 'zh', 'vi'];
+let currentLanguage = SUPPORTED_LANGUAGES.includes(localStorage.getItem('lovechat.lang'))
+  ? localStorage.getItem('lovechat.lang') : 'en';
+
+function t(key, vars = {}) {
+  const template = I18N[currentLanguage][key] || I18N.en[key] || key;
+  return template.replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? '');
+}
+
+let currentStatus = { key: 'statusConnecting', vars: {} };
+
+function applyLanguage(language, persist = true) {
+  if (!SUPPORTED_LANGUAGES.includes(language)) language = 'en';
+  const previousPartnerLabels = SUPPORTED_LANGUAGES.map((code) => I18N[code].partner);
+  currentLanguage = language;
+  if (persist) localStorage.setItem('lovechat.lang', language);
+  document.documentElement.lang = language === 'zh' ? 'zh-CN' : language;
+  document.title = t('pageTitle');
+  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle); });
+  document.querySelectorAll('.language-option').forEach((el) => el.classList.toggle('active', el.dataset.language === language));
+  if ($('languageSelect')) $('languageSelect').value = language;
+
+  if (!peerName || previousPartnerLabels.includes(peerName)) peerName = t('partner');
+  if ($('peerName') && (!$('peerName').textContent || previousPartnerLabels.includes($('peerName').textContent))) {
+    $('peerName').textContent = peerName;
+  }
+  if ($('peerStatus')) setStatus(currentStatus.key, currentStatus.vars);
+  if ($('momentList') && moments.length) renderMoments();
+  if ($('callOverlay') && !$('callOverlay').classList.contains('hidden') && callState !== 'idle') {
+    showCallUI(callState, peerName);
+  }
+}
+
+document.querySelectorAll('.language-option').forEach((button) => {
+  button.addEventListener('click', () => applyLanguage(button.dataset.language));
+});
+$('languageSelect').addEventListener('change', (event) => applyLanguage(event.target.value));
+
 // ---------- 身份 ----------
 function getToken() {
   let t = localStorage.getItem('lovechat.token');
@@ -22,7 +172,7 @@ const TOKEN = getToken();
 let ws = null;
 let myName = '';
 let roomId = '';
-let peerName = 'Người ấy';
+let peerName = t('partner');
 let online = [];
 let avatars = {}; // name -> avatar url
 let moments = []; // 动态列表
@@ -68,7 +218,7 @@ function wsURL() {
 function connect() {
   clearTimeout(reconnectTimer);
   manualClose = false;
-  setStatus('Đang kết nối…');
+  setStatus('statusConnecting');
 
   try { ws = new WebSocket(wsURL()); }
   catch { return scheduleReconnect(); }
@@ -91,7 +241,7 @@ function connect() {
 
   ws.onclose = () => {
     if (manualClose) return;
-    setStatus('Mất kết nối, đang kết nối lại…');
+    setStatus('statusReconnecting');
     scheduleReconnect();
   };
   ws.onerror = () => {};
@@ -105,13 +255,30 @@ function scheduleReconnect() {
 }
 
 function send(obj) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return toast('Chưa kết nối');
-  try { ws.send(JSON.stringify(obj)); } catch { toast('Gửi thất bại'); }
+  if (!ws || ws.readyState !== WebSocket.OPEN) return toast(t('notConnected'));
+  try { ws.send(JSON.stringify(obj)); } catch { toast(t('sendFailed')); }
 }
 
-function setStatus(text) {
-  $('peerStatus').textContent = text;
-  $('peerStatus').classList.toggle('online', text.includes('Trực tuyến'));
+function setStatus(key, vars = {}) {
+  currentStatus = { key, vars };
+  $('peerStatus').textContent = t(key, vars);
+  $('peerStatus').classList.toggle('online', key === 'statusOnline');
+}
+
+const SERVER_ERROR_KEYS = new Map([
+  ['Mật khẩu không đúng', 'wrongPassword'],
+  ['Định dạng tin nhắn không hợp lệ', 'invalidMessage'],
+  ['Máy chủ gặp lỗi khi xử lý', 'serverProcessingError'],
+  ['Tham số không hợp lệ', 'invalidParams'],
+  ['Bạn chưa tham gia phòng', 'notInRoom'],
+  ['Địa chỉ tệp không hợp lệ', 'invalidFileUrl'],
+  ['Tệp quá lớn', 'serverFileTooLarge'],
+  ['Lệnh không xác định', 'unknownCommand'],
+]);
+
+function localizeServerError(message) {
+  const key = SERVER_ERROR_KEYS.get(message);
+  return key ? t(key) : (message || t('genericError'));
 }
 
 // ================= 消息处理 =================
@@ -124,7 +291,7 @@ function handle(m) {
       if (m.name) peerName = m.name;
       $('peerName').textContent = peerName;
       updatePeerAvatar();
-      setStatus('Trực tuyến');
+      setStatus('statusOnline');
       break;
 
     case 'message':
@@ -136,13 +303,13 @@ function handle(m) {
       const hadOnline = online.length > 0;
       online = m.online || [];
       const meOnline = online.includes(myName);
-      setStatus(meOnline && online.length >= 2 ? 'Trực tuyến' : 'Ngoại tuyến');
-      if (hadOnline && online.length < 2) toast('Người ấy đã ngoại tuyến');
+      setStatus(meOnline && online.length >= 2 ? 'statusOnline' : 'statusOffline');
+      if (hadOnline && online.length < 2) toast(t('partnerOffline'));
       break;
     }
 
     case 'typing':
-      if (m.from !== myName) { setStatus(`${m.from} đang nhập…`); setTimeout(() => setStatus('Trực tuyến'), 1500); }
+      if (m.from !== myName) { setStatus('statusTyping', { name: m.from }); setTimeout(() => setStatus('statusOnline'), 1500); }
       break;
 
     case 'avatar':
@@ -171,8 +338,8 @@ function handle(m) {
 
     case 'error':
       console.warn('[ws error]', m.error, m); // 定位服务器错误来源
-      toast(m.error || 'Đã xảy ra lỗi');
-      if (m.error === 'Mật khẩu không đúng') {
+      toast(localizeServerError(m.error));
+      if (SERVER_ERROR_KEYS.get(m.error) === 'wrongPassword') {
         // 密码不对, 关掉连接回大厅重试(避免僵尸连接)
         manualClose = true;
         if (ws) { try { ws.close(); } catch {} }
@@ -285,7 +452,7 @@ function renderMessage(m, isHistory = false, container = null) {
     bubble.classList.add('image');
     const img = document.createElement('img');
     img.src = m.url || ('data:' + (m.mime || 'image/png') + ';base64,' + (m.data || ''));
-    img.alt = m.name || 'Hình ảnh';
+    img.alt = m.name || t('image');
     img.loading = 'lazy';
     img.onclick = () => showImagePreview(img.src);
     bubble.appendChild(img);
@@ -301,7 +468,7 @@ function renderMessage(m, isHistory = false, container = null) {
       if (a) {
         bubble.classList.add('playing');
         a.onended = () => bubble.classList.remove('playing');
-        a.onerror = () => { bubble.classList.remove('playing'); toast('Không thể phát tin nhắn thoại'); };
+        a.onerror = () => { bubble.classList.remove('playing'); toast(t('voicePlaybackFailed')); };
       }
     };
     // 我的新语音(刚发出去的)自动播放 — 本地播放不依赖对端
@@ -313,7 +480,7 @@ function renderMessage(m, isHistory = false, container = null) {
   } else if (m.kind === 'file') {
     bubble.classList.add('file');
     bubble.innerHTML = `<span class="f-icon">📄</span><span class="f-name"></span>`;
-    bubble.querySelector('.f-name').textContent = m.name || 'Tệp';
+    bubble.querySelector('.f-name').textContent = m.name || t('file');
     bubble.onclick = () => {
       if (m.url) { window.open(m.url, '_blank'); return; }
       const a = document.createElement('a');
@@ -382,7 +549,7 @@ function startRecording() {
       $('recTimer').textContent = '0:00';
       recTimerRaf = requestAnimationFrame(tickRecTimer);
     })
-    .catch(() => toast('Không thể truy cập micro'));
+    .catch(() => toast(t('microphoneDenied')));
 }
 
 function tickRecTimer() {
@@ -406,13 +573,13 @@ function stopRecording(sendIt = true) {
     const dur = Math.max(1, Math.round((Date.now() - recStart) / 1000));
     const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
     // 语音走 HTTP 上传(服务端流式播放), 不再整包 base64 走 WS
-    toast('Đang tải tin nhắn thoại…');
+    toast(t('uploadingVoice'));
     uploadFile(new File([blob], 'voice.webm', { type: blob.type }))
       .then((url) => {
         send({ type: 'file', kind: 'voice', name: 'voice.webm', url, mime: blob.type || 'audio/webm', duration: dur });
         if (autoPlayVoice) playVoice({ url, mime: blob.type || 'audio/webm' }, true);
       })
-      .catch(() => toast('Tải tin nhắn thoại thất bại'));
+      .catch(() => toast(t('voiceUploadFailed')));
   };
   mediaRecorder.stop();
 }
@@ -460,7 +627,7 @@ async function createPeer() {
         showCallUI('reconnecting', peerName);
         restartIce();
       } else if (s === 'failed') {
-        endCall('Cuộc gọi bị gián đoạn');
+        endCall(t('callInterrupted'));
       }
     } else if (s === 'connected' || s === 'completed') {
       iceRestartCount = 0; // 重置重试计数
@@ -469,7 +636,7 @@ async function createPeer() {
   };
   pc.onconnectionstatechange = () => {
     if (pc && ['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
-      endCall('Cuộc gọi bị gián đoạn');
+      endCall(t('callInterrupted'));
     }
   };
   return pc;
@@ -481,7 +648,7 @@ async function restartIce() {
     await pc.setLocalDescription(offer);
     send({ type: 'signal', signal: { type: 'offer', sdp: pc.localDescription, restart: true } });
   } catch (e) {
-    endCall('Kết nối lại thất bại');
+    endCall(t('reconnectFailed'));
   }
 }
 
@@ -532,7 +699,7 @@ async function startCall() {
     ensureAudioContext(); // 安卓 Chrome 必须, 否则发出的轨道无声
     localStream.getAudioTracks().forEach((t) => { t.enabled = true; });
   } catch {
-    return toast('Không thể truy cập micro');
+    return toast(t('microphoneDenied'));
   }
   callState = 'calling';
   iceRestartCount = 0;
@@ -562,27 +729,27 @@ async function handleCall(from, action) {
     showCallUI('ringing', from);
     $('callBtn').classList.add('ringing');
   } else if (action === 'busy') {
-    endCall(from + ' đang bận');
+    endCall(t('busy', { name: from }));
   } else if (action === 'accept') {
     if (callState === 'calling') {
       callState = 'talking';
       showCallUI('talking', peerName);
     }
   } else if (action === 'reject') {
-    endCall('Người ấy đã từ chối cuộc gọi');
+    endCall(t('callDeclined'));
   } else if (action === 'hangup') {
-    endCall('Cuộc gọi đã kết thúc');
+    endCall(t('callEnded'));
   }
 }
 
 function showCallUI(mode, name) {
   $('callOverlay').classList.remove('hidden');
-  $('callTitle').textContent = mode === 'talking' ? `Đang gọi với ${name}` : name;
+  $('callTitle').textContent = mode === 'talking' || mode === 'reconnecting' ? t('callWith', { name }) : name;
   $('callStatus').textContent =
-    mode === 'calling' ? 'Đang chờ người ấy trả lời…' :
-    mode === 'ringing' ? 'Đang mời bạn vào cuộc gọi thoại…' :
-    mode === 'talking' ? 'Thời lượng 0:00' :
-    mode === 'reconnecting' ? 'Đang kết nối lại…' : '';
+    mode === 'calling' ? t('waitingAnswer') :
+    mode === 'ringing' ? t('incomingCall') :
+    mode === 'talking' ? t('duration', { time: '0:00' }) :
+    mode === 'reconnecting' ? t('statusReconnecting') : '';
   $('callReject').classList.toggle('hidden', mode === 'talking' || mode === 'reconnecting');
   $('callAccept').classList.toggle('hidden', mode !== 'ringing');
   $('callHangup').classList.toggle('hidden', mode === 'ringing' || mode === 'idle');
@@ -596,7 +763,8 @@ function showCallUI(mode, name) {
 function tickCallTimer() {
   if (callState !== 'talking') return;
   const sec = Math.floor((Date.now() - callStartTime) / 1000);
-  $('callStatus').textContent = `Thời lượng ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  const time = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  $('callStatus').textContent = t('duration', { time });
   callTimerRaf = requestAnimationFrame(tickCallTimer);
 }
 
@@ -619,13 +787,13 @@ function endCall(reason) {
 
 async function acceptCall() {
   if (callState !== 'ringing') return;
-  if (!pendingOffer) { toast('Kết nối chưa sẵn sàng, vui lòng thử lại'); return; }
+  if (!pendingOffer) { toast(t('callNotReady')); return; }
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
     ensureAudioContext(); // 安卓 Chrome 必须, 否则发出的轨道无声
     localStream.getAudioTracks().forEach((t) => { t.enabled = true; });
   } catch {
-    return toast('Không thể truy cập micro');
+    return toast(t('microphoneDenied'));
   }
   callState = 'talking';
   iceRestartCount = 0;
@@ -635,7 +803,7 @@ async function acceptCall() {
   try {
     await pc.setRemoteDescription(pendingOffer.sdp);
   } catch {
-    endCall('Kết nối thất bại');
+    endCall(t('connectionFailed'));
     return;
   }
   pendingOffer = null;
@@ -661,9 +829,9 @@ async function handleSignal(from, signal) {
           await pc.setLocalDescription(answer);
           send({ type: 'signal', signal: { type: 'answer', sdp: pc.localDescription } });
           showCallUI('reconnecting', peerName);
-          toast('Đang kết nối lại…');
+          toast(t('statusReconnecting'));
         } catch (e) {
-          endCall('Kết nối lại thất bại');
+          endCall(t('reconnectFailed'));
         }
       }
     } else if (callState === 'ringing') {
@@ -729,8 +897,8 @@ async function uploadFile(file) {
 
 async function readAndSend(file, kind) {
   if (!file) return;
-  if (file.size > 8 * 1024 * 1024) return toast('Tệp không được vượt quá 8 MB');
-  toast('Đang tải lên…');
+  if (file.size > 8 * 1024 * 1024) return toast(t('fileTooLarge'));
+  toast(t('uploading'));
   try {
     let toUpload = file;
     if (kind === 'image' && file.type.startsWith('image/')) {
@@ -745,7 +913,7 @@ async function readAndSend(file, kind) {
       mime: toUpload.type || 'application/octet-stream',
     });
   } catch {
-    toast('Tải lên thất bại');
+    toast(t('uploadFailed'));
   }
 }
 
@@ -841,7 +1009,10 @@ document.addEventListener('click', (e) => {
   const panel = $('emojiPanel');
   if (!panel.classList.contains('hidden') && !panel.contains(e.target)) panel.classList.add('hidden');
 });
-$('sendBtn').onclick = () => $('emojiPanel').classList.add('hidden');
+$('sendBtn').onclick = () => {
+  $('emojiPanel').classList.add('hidden');
+  sendText();
+};
 
 // 录音(按住说话) — 兼容触屏+鼠标, 防止双触发
 const micBtn = $('micBtn');
@@ -901,7 +1072,7 @@ $('callAccept').onclick = () => {
 };
 $('callReject').onclick = () => {
   send({ type: 'call', action: 'reject' });
-  endCall('Đã từ chối');
+  endCall(t('rejected'));
 };
 $('callHangup').onclick = () => endCall();
 
@@ -922,7 +1093,7 @@ $('avatarPicker').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f) return;
-  if (!f.type.startsWith('image/')) return toast('Vui lòng chọn một hình ảnh');
+  if (!f.type.startsWith('image/')) return toast(t('chooseImage'));
   try {
     // 裁剪器: 微信式正方形选区, 可拖动/缩放
     const cropped = await openCropper(f);
@@ -930,9 +1101,9 @@ $('avatarPicker').addEventListener('change', async (e) => {
     const small = await compressToSquare(cropped, 320);
     const url = await uploadFile(small);
     send({ type: 'setAvatar', url });
-    toast('Đã cập nhật ảnh đại diện');
+    toast(t('avatarUpdated'));
   } catch {
-    toast('Tải ảnh đại diện thất bại');
+    toast(t('avatarUploadFailed'));
   }
 });
 
@@ -1070,13 +1241,13 @@ function openCropper(file) {
         try {
           c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         } catch {
-          toast('Hình ảnh quá lớn, không thể xử lý');
+          toast(t('imageTooLarge'));
           cleanup();
           resolveFn(false);
           return;
         }
         c.toBlob((blob) => {
-          if (!blob) { toast('Xử lý hình ảnh thất bại'); cleanup(); resolveFn(false); return; }
+          if (!blob) { toast(t('imageProcessFailed')); cleanup(); resolveFn(false); return; }
           img.src = URL.createObjectURL(blob); // 重新触发 onload, 走正常 fit()
         }, 'image/jpeg', 0.9);
         return;
@@ -1085,7 +1256,7 @@ function openCropper(file) {
       confirmBtn.disabled = false;
     };
     img.onerror = () => {
-      toast('Không thể tải hình ảnh, vui lòng chọn ảnh khác');
+      toast(t('imageLoadFailed'));
       cleanup();
       resolveFn(false);
     };
@@ -1094,7 +1265,7 @@ function openCropper(file) {
     $('cropCancel').onclick = () => { cleanup(); resolveFn(false); };
     $('cropConfirm').onclick = () => {
       const { sx, sy, s } = cropRect();
-      if (s < 8) return toast('Vùng chọn quá nhỏ');
+      if (s < 8) return toast(t('selectionTooSmall'));
       let canvas;
       try {
         canvas = document.createElement('canvas');
@@ -1103,10 +1274,10 @@ function openCropper(file) {
       } catch {
         cleanup();
         resolveFn(false);
-        return toast('Xử lý hình ảnh thất bại');
+        return toast(t('imageProcessFailed'));
       }
       canvas.toBlob((blob) => {
-        if (!blob) { cleanup(); resolveFn(false); return toast('Cắt ảnh thất bại'); }
+        if (!blob) { cleanup(); resolveFn(false); return toast(t('cropFailed')); }
         cleanup();
         resolveFn(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }));
       }, 'image/jpeg', 0.9);
@@ -1118,14 +1289,14 @@ $('bgPicker').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f) return;
-  toast('Đang tải hình nền…');
+  toast(t('uploadingBackground'));
   try {
     const small = await compressImage(f);
     const url = await uploadFile(small);
     localStorage.setItem('lovechat.bg', url);
     applyBg();
   } catch {
-    toast('Tải hình nền thất bại');
+    toast(t('backgroundUploadFailed'));
   }
 });
 $('resetBgBtn').onclick = () => {
@@ -1192,7 +1363,7 @@ function renderMoments() {
         grid.appendChild(img);
       }
     }
-    card.querySelector('.like-count').textContent = mo.likes && mo.likes.length ? mo.likes.length : 'Thích';
+    card.querySelector('.like-count').textContent = mo.likes && mo.likes.length ? mo.likes.length : t('like');
     card.querySelector('.moment-like').onclick = () => send({ type: 'momentLike', id: mo.id });
     list.appendChild(card);
   }
@@ -1204,7 +1375,7 @@ $('momentPicker').addEventListener('change', async (e) => {
   const files = [...e.target.files].slice(0, 4 - momentImages.length);
   e.target.value = '';
   if (!files.length) return;
-  toast('Đang tải hình ảnh…');
+  toast(t('uploadingImages'));
   for (const f of files) {
     try {
       const small = await compressImage(f);
@@ -1212,7 +1383,7 @@ $('momentPicker').addEventListener('change', async (e) => {
       momentImages.push(url);
       renderMomentPics();
     } catch {
-      toast('Tải hình ảnh thất bại');
+      toast(t('imageUploadFailed'));
     }
   }
 });
@@ -1234,7 +1405,7 @@ function renderMomentPics() {
 }
 $('momentSend').onclick = () => {
   const text = $('momentText').value.trim();
-  if (!text && !momentImages.length) return toast('Hãy viết vài dòng hoặc thêm một hình ảnh');
+  if (!text && !momentImages.length) return toast(t('momentEmpty'));
   send({ type: 'moment', text, images: momentImages });
   $('momentText').value = '';
   momentImages = [];
@@ -1243,10 +1414,10 @@ $('momentSend').onclick = () => {
 
 // ================= 入口 =================
 function enter() {
-  const name = $('nameInput').value.trim() || 'Người ấy';
+  const name = $('nameInput').value.trim() || t('partner');
   const room = $('roomInput').value.trim();
-  if (!room) { toast('Vui lòng nhập tên phòng'); return; }
-  if (!/^[\p{L}\p{N}_-]{1,32}$/u.test(room)) { toast('Tên phòng không hợp lệ'); return; }
+  if (!room) { toast(t('roomRequired')); return; }
+  if (!/^[\p{L}\p{N}_-]{1,32}$/u.test(room)) { toast(t('invalidRoom')); return; }
   myName = name;
   roomId = /^[A-Za-z0-9_-]+$/.test(room) ? room : hashRoom(room);
   localStorage.setItem('lovechat.name', myName);
@@ -1276,6 +1447,7 @@ $('nameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('ro
 
 $('nameInput').value = localStorage.getItem('lovechat.name') || '';
 $('roomInput').value = localStorage.getItem('lovechat.room') || '';
+applyLanguage(currentLanguage, false);
 
 // 断线自动重连 + 后台恢复
 document.addEventListener('visibilitychange', () => {

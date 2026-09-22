@@ -164,6 +164,39 @@ body::before {
   position: relative;
 }
 
+.language-switcher {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 3px;
+  margin: -20px auto 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.language-option {
+  min-width: 0;
+  padding: 8px 7px;
+  border: 0;
+  border-radius: var(--r-full);
+  color: var(--text-secondary);
+  background: transparent;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 180ms var(--ease-out), background 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
+}
+
+.language-option:hover { color: var(--text-primary); background: var(--surface); }
+.language-option.active {
+  color: white;
+  background: var(--grad-primary);
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35), var(--inset-hairline);
+}
+
 .brand {
   text-align: center;
   margin-bottom: 32px;
@@ -414,6 +447,25 @@ body::before {
   box-shadow: var(--shadow-glow);
 }
 .icon-btn.primary:hover { transform: translateY(-1px); }
+
+.language-select {
+  width: 48px;
+  height: 32px;
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-full);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+}
+.language-select:hover,
+.language-select:focus { color: var(--text-primary); border-color: var(--border-accent); }
+.language-select option { color: #111827; background: white; }
 
 /* ===== 消息区 ===== */
 .msg-list {
@@ -1165,6 +1217,11 @@ body::before {
   .msg .bubble.image img { max-width: 180px; max-height: 240px; }
   .lobby-card { padding: 32px 22px 24px; }
   .brand-name { font-size: 38px; }
+  .language-switcher { margin-top: -14px; }
+  .language-option { padding-inline: 5px; font-size: 10.5px; }
+  .topbar { gap: 5px; padding-inline: 9px; }
+  .language-select { width: 42px; padding-inline: 3px; }
+  .icon-btn { width: 34px; height: 34px; }
 }
 
 /* 减少动画 */

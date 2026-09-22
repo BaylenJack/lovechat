@@ -1,39 +1,44 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b1e">
-<title>lovechat — Không gian của hai người</title>
+<title>lovechat — A space for two</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23a855f7'/><stop offset='1' stop-color='%23ec4899'/></linearGradient></defs><circle cx='16' cy='16' r='13' fill='%230a0b1e'/><path d='M11 16 L14 19 L21 12' stroke='url(%23g)' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@1&display=swap">
-<link rel="stylesheet" href="/style.css?v=5-vi">
+<link rel="stylesheet" href="/style.css?v=6-i18n">
 </head>
 <body>
 
 <!-- ===== 登录/进入 ===== -->
 <div id="lobby" class="lobby">
   <div class="lobby-card">
+    <div class="language-switcher" role="group" aria-label="Language">
+      <button type="button" class="language-option active" data-language="en">English</button>
+      <button type="button" class="language-option" data-language="zh">中文</button>
+      <button type="button" class="language-option" data-language="vi">Tiếng Việt</button>
+    </div>
     <div class="brand">
       <h1 class="brand-name">lovechat</h1>
-      <p class="brand-sub">Không gian riêng dành cho hai người</p>
+      <p class="brand-sub" data-i18n="brandSub">A private space for two</p>
     </div>
     <label class="field">
-      <span class="field-label">Tên của bạn</span>
-      <input id="nameInput" class="field-input" maxlength="16" placeholder="Nhập tên của bạn" autocomplete="off">
+      <span class="field-label" data-i18n="nameLabel">Your name</span>
+      <input id="nameInput" class="field-input" maxlength="16" placeholder="Enter your name" data-i18n-placeholder="namePlaceholder" autocomplete="off">
     </label>
     <label class="field">
-      <span class="field-label">Tên phòng</span>
-      <input id="roomInput" class="field-input" maxlength="32" placeholder="Hai bạn dùng cùng một tên phòng" autocomplete="off">
+      <span class="field-label" data-i18n="roomLabel">Room name</span>
+      <input id="roomInput" class="field-input" maxlength="32" placeholder="Use the same room name" data-i18n-placeholder="roomPlaceholder" autocomplete="off">
     </label>
     <label class="field">
-      <span class="field-label">Mật khẩu phòng</span>
-      <input id="passInput" class="field-input" maxlength="64" type="password" placeholder="Đặt mới hoặc nhập mật khẩu hiện có" autocomplete="off">
+      <span class="field-label" data-i18n="passwordLabel">Room password</span>
+      <input id="passInput" class="field-input" maxlength="64" type="password" placeholder="Create or enter the room password" data-i18n-placeholder="passwordPlaceholder" autocomplete="off">
     </label>
-    <button id="enterBtn" class="btn-primary">Vào phòng →</button>
-    <p class="hint">Chia sẻ cùng tên phòng và mật khẩu để bắt đầu trò chuyện.</p>
+    <button id="enterBtn" class="btn-primary" data-i18n="enterRoom">Enter room →</button>
+    <p class="hint" data-i18n="lobbyHint">Share the same room name and password to start chatting.</p>
   </div>
 </div>
 
@@ -44,27 +49,32 @@
     <div class="peer">
       <div class="peer-avatar" id="peerAvatar">?</div>
       <div class="peer-info">
-        <div class="peer-name" id="peerName">Người ấy</div>
-        <div class="peer-status" id="peerStatus">Đang kết nối…</div>
+        <div class="peer-name" id="peerName" data-i18n="partner">Your partner</div>
+        <div class="peer-status" id="peerStatus" data-i18n="statusConnecting">Connecting…</div>
       </div>
     </div>
-    <button id="momentsBtn" class="icon-btn" title="Khoảnh khắc">🌙</button>
-    <button id="settingsBtn" class="icon-btn" title="Cài đặt">⚙️</button>
-    <button id="callBtn" class="icon-btn primary" title="Cuộc gọi thoại">📞</button>
+    <select id="languageSelect" class="language-select" aria-label="Language">
+      <option value="en">EN</option>
+      <option value="zh">中文</option>
+      <option value="vi">VI</option>
+    </select>
+    <button id="momentsBtn" class="icon-btn" title="Moments" data-i18n-title="moments">🌙</button>
+    <button id="settingsBtn" class="icon-btn" title="Settings" data-i18n-title="settings">⚙️</button>
+    <button id="callBtn" class="icon-btn primary" title="Voice call" data-i18n-title="voiceCall">📞</button>
   </header>
 
   <div id="msgList" class="msg-list">
-    <div class="day-divider">Hãy bắt đầu trò chuyện</div>
+    <div class="day-divider" data-i18n="startChat">Start the conversation</div>
   </div>
 
   <!-- ===== 动态视图 ===== -->
   <div id="momentsView" class="moments hidden">
     <div class="moment-compose">
-      <textarea id="momentText" class="moment-text" maxlength="1000" rows="2" placeholder="Bạn muốn chia sẻ điều gì…"></textarea>
+      <textarea id="momentText" class="moment-text" maxlength="1000" rows="2" placeholder="What would you like to share?" data-i18n-placeholder="momentPlaceholder"></textarea>
       <div id="momentPics" class="moment-pics"></div>
       <div class="moment-actions">
-        <button id="momentPicBtn" class="btn-mini ghost">📷 Thêm ảnh</button>
-        <button id="momentSend" class="btn-mini">Đăng</button>
+        <button id="momentPicBtn" class="btn-mini ghost"><span>📷</span> <span data-i18n="addPhoto">Add photo</span></button>
+        <button id="momentSend" class="btn-mini" data-i18n="post">Post</button>
       </div>
     </div>
     <div id="momentList" class="moment-list"></div>
@@ -72,19 +82,19 @@
   <input type="file" id="momentPicker" class="hidden" accept="image/*" multiple>
 
   <footer id="inputbar" class="inputbar">
-    <button id="micBtn" class="input-btn" title="Giữ để nói">🎤</button>
-    <button id="imgBtn" class="input-btn" title="Gửi ảnh">📷</button>
-    <button id="fileBtn" class="input-btn" title="Gửi tệp">📎</button>
-    <button id="emojiBtn" class="input-btn" title="Biểu tượng cảm xúc">😊</button>
-    <input id="textInput" class="text-input" type="text" placeholder="Nhập tin nhắn…" autocomplete="off">
-    <button id="sendBtn" class="send-btn hidden">Gửi</button>
+    <button id="micBtn" class="input-btn" title="Hold to talk" data-i18n-title="holdToTalk">🎤</button>
+    <button id="imgBtn" class="input-btn" title="Send image" data-i18n-title="sendImage">📷</button>
+    <button id="fileBtn" class="input-btn" title="Send file" data-i18n-title="sendFile">📎</button>
+    <button id="emojiBtn" class="input-btn" title="Emoji" data-i18n-title="emoji">😊</button>
+    <input id="textInput" class="text-input" type="text" placeholder="Type a message…" data-i18n-placeholder="messagePlaceholder" autocomplete="off">
+    <button id="sendBtn" class="send-btn hidden" data-i18n="send">Send</button>
 
     <!-- 表情面板 -->
     <div id="emojiPanel" class="emoji-panel hidden"></div>
 
     <!-- 按住说话覆盖层 -->
     <div id="recordingOverlay" class="recording hidden">
-      <div class="rec-order">Thả để gửi · Vuốt lên để hủy</div>
+      <div class="rec-order" data-i18n="releaseToSend">Release to send · Swipe up to cancel</div>
       <div class="rec-timer" id="recTimer">0:00</div>
     </div>
   </footer>
@@ -96,8 +106,8 @@
 <div id="callOverlay" class="call-overlay hidden">
   <div class="call-card">
     <div class="call-avatar" id="callAvatar">?</div>
-    <div class="call-title" id="callTitle">Cuộc gọi thoại</div>
-    <div class="call-status" id="callStatus">Đang gọi…</div>
+    <div class="call-title" id="callTitle" data-i18n="voiceCall">Voice call</div>
+    <div class="call-status" id="callStatus" data-i18n="calling">Calling…</div>
     <div class="call-actions">
       <button id="callReject" class="call-btn-round call-reject hidden">✕</button>
       <button id="callAccept" class="call-btn-round call-accept hidden">✓</button>
@@ -109,29 +119,29 @@
 <!-- ===== 设置面板 ===== -->
 <div id="settingsOverlay" class="call-overlay hidden">
   <div class="call-card settings-card">
-    <div class="call-title" style="text-align: center; margin-bottom: 8px;">Cài đặt</div>
+    <div class="call-title" style="text-align: center; margin-bottom: 8px;" data-i18n="settings">Settings</div>
     <div class="setting-row">
       <div>
-        <div class="setting-label">Ảnh đại diện của tôi</div>
-        <div class="setting-sub">Người ấy cũng sẽ thấy ảnh mới</div>
+        <div class="setting-label" data-i18n="myAvatar">My avatar</div>
+        <div class="setting-sub" data-i18n="avatarSub">Your partner will see the new avatar too</div>
       </div>
       <div class="setting-actions">
         <img id="myAvatarPrev" class="avatar-preview" alt="">
-        <button id="pickAvatarBtn" class="btn-mini">Thay đổi</button>
+        <button id="pickAvatarBtn" class="btn-mini" data-i18n="change">Change</button>
       </div>
     </div>
     <div class="setting-row">
       <div>
-        <div class="setting-label">Hình nền trò chuyện</div>
-        <div class="setting-sub">Chỉ hiển thị với bạn</div>
+        <div class="setting-label" data-i18n="chatBackground">Chat background</div>
+        <div class="setting-sub" data-i18n="backgroundSub">Only visible to you</div>
       </div>
       <div class="setting-actions">
-        <button id="pickBgBtn" class="btn-mini">Thay đổi</button>
-        <button id="resetBgBtn" class="btn-mini ghost">Mặc định</button>
+        <button id="pickBgBtn" class="btn-mini" data-i18n="change">Change</button>
+        <button id="resetBgBtn" class="btn-mini ghost" data-i18n="default">Default</button>
       </div>
     </div>
     <div class="call-actions">
-      <button id="settingsClose" class="btn-mini ghost">Đóng</button>
+      <button id="settingsClose" class="btn-mini ghost" data-i18n="close">Close</button>
     </div>
   </div>
 </div>
@@ -141,20 +151,20 @@
 <!-- ===== 头像裁剪器(微信式正方形选区) ===== -->
 <div id="cropOverlay" class="call-overlay hidden">
   <div class="crop-card">
-    <div class="crop-title">Điều chỉnh ảnh đại diện</div>
+    <div class="crop-title" data-i18n="cropTitle">Adjust avatar</div>
     <div class="crop-stage" id="cropStage">
       <img id="cropImg" alt="">
       <div class="crop-box" id="cropBox"><span class="crop-grip grip-nw"></span><span class="crop-grip grip-ne"></span><span class="crop-grip grip-sw"></span><span class="crop-grip grip-se"></span></div>
-      <div class="crop-hint">Kéo để di chuyển · Kéo góc để đổi kích thước</div>
+      <div class="crop-hint" data-i18n="cropHint">Drag to move · Drag the corner to resize</div>
     </div>
     <div class="crop-actions">
-      <button id="cropCancel" class="btn-mini ghost">Hủy</button>
-      <button id="cropConfirm" class="btn-mini">Xác nhận</button>
+      <button id="cropCancel" class="btn-mini ghost" data-i18n="cancel">Cancel</button>
+      <button id="cropConfirm" class="btn-mini" data-i18n="confirm">Confirm</button>
     </div>
   </div>
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="/app.js?v=5-vi"></script>
+<script src="/app.js?v=6-i18n"></script>
 </body>
 </html>
