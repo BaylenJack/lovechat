@@ -187,6 +187,8 @@ ok(pageHTML.includes('<html lang="en">'), '默认语言为英语');
 ok(['en', 'zh', 'vi'].every((lang) => pageHTML.includes(`data-language="${lang}"`)), '提供英语、中文和越南语切换');
 ok(['en:', 'zh:', 'vi:'].every((marker) => appJS.includes(marker)), '三套语言字典均已加载');
 ok(appJS.includes("localStorage.setItem('lovechat.lang'"), '记住用户的语言选择');
+ok(appJS.includes('turn:114.132.229.58:3478'), '语音中继使用广州服务器');
+ok(!appJS.includes('47.82.0.187'), '不再依赖已注销的新加坡服务器');
 
 p1.close(); p2.close(); a3.close(); vi.close();
 a2.close(); b.close(); c.close();

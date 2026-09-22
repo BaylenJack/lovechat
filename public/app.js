@@ -587,16 +587,16 @@ function stopRecording(sendIt = true) {
 // ================= WebRTC 语音通话 =================
 // ICE: 先 STUN 尝试 P2P 直连(自建 STUN 优先, 国内可达), 穿不过时用 TURN 中继
 const iceServers = [
-  { urls: 'stun:47.82.0.187:3478' },
+  { urls: 'stun:114.132.229.58:3478' },
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   {
-    urls: 'turn:47.82.0.187:3478?transport=udp',
+    urls: 'turn:114.132.229.58:3478?transport=udp',
     username: 'love',
     credential: '0f46acd18fe61a4a',
   },
   {
-    urls: 'turn:47.82.0.187:3478?transport=tcp',
+    urls: 'turn:114.132.229.58:3478?transport=tcp',
     username: 'love',
     credential: '0f46acd18fe61a4a',
   },
