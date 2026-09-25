@@ -189,6 +189,12 @@ ok(['en:', 'zh:', 'vi:'].every((marker) => appJS.includes(marker)), '三套语�
 ok(appJS.includes("localStorage.setItem('lovechat.lang'"), '记住用户的语言选择');
 ok(appJS.includes('turn:114.132.229.58:3478'), '语音中继使用广州服务器');
 ok(!appJS.includes('47.82.0.187'), '不再依赖已注销的新加坡服务器');
+ok(appJS.includes("callState = 'reconnecting'"), 'ICE 异常会进入明确的重连状态');
+ok(appJS.includes('MAX_ICE_RESTARTS = 2'), 'ICE 重连最多重试两次');
+ok(appJS.includes('ICE_DISCONNECT_GRACE_MS = 5000'), '瞬时断网保留五秒自行恢复窗口');
+ok(appJS.includes('iceCandidatePoolSize: 4'), '预收集 ICE 候选以缩短接通时间');
+ok(appJS.includes("bundlePolicy: 'max-bundle'"), '音频链路使用单一传输通道');
+ok(!/\['failed',\s*'disconnected',\s*'closed'\][\s\S]{0,120}endCall/.test(appJS), '短暂 disconnected 不再立即挂断');
 
 p1.close(); p2.close(); a3.close(); vi.close();
 a2.close(); b.close(); c.close();

@@ -189,7 +189,16 @@ let callStartTime = 0;
 let callTimerRaf = null;
 let pendingOffer = null;
 let pendingIce = []; // 远端描述设置前暂存 ICE 候选
-let iceRestartCount = 0; // ICE 重试次数 (最多 1 次)
+const MAX_ICE_RESTARTS = 2;
+const ICE_DISCONNECT_GRACE_MS = 5000;
+const ICE_RESTART_TIMEOUT_MS = 12000;
+const ICE_RECOVERY_DEADLINE_MS = 30000;
+let callInitiator = false;
+let iceRestartCount = 0;
+let iceRestartInFlight = false;
+let iceDisconnectTimer = null;
+let iceRestartTimer = null;
+let iceRecoveryDeadlineTimer = null;
 
 // 录音状态
 let mediaRecorder = null;
@@ -255,8 +264,8 @@ function scheduleReconnect() {
 }
 
 function send(obj) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return toast(t('notConnected'));
-  try { ws.send(JSON.stringify(obj)); } catch { toast(t('sendFailed')); }
+  if (!ws || ws.readyState !== WebSocket.OPEN) { toast(t('notConnected')); return false; }
+  try { ws.send(JSON.stringify(obj)); return true; } catch { toast(t('sendFailed')); return false; }
 }
 
 function setStatus(key, vars = {}) {
@@ -606,11 +615,80 @@ const AUDIO_CONSTRAINTS = {
   echoCancellation: true,
   noiseSuppression: true,
   autoGainControl: true,
+  sampleRate: { ideal: 48000 },
+  channelCount: { ideal: 1 },
+  latency: { ideal: 0.02 },
 };
 
+// 支持时启用系统级人声隔离；不支持的浏览器不发送该约束，避免取流失败。
+if (navigator.mediaDevices?.getSupportedConstraints?.().voiceIsolation) {
+  AUDIO_CONSTRAINTS.voiceIsolation = true;
+}
+
+function clearIceRecoveryTimers() {
+  clearTimeout(iceDisconnectTimer);
+  clearTimeout(iceRestartTimer);
+  clearTimeout(iceRecoveryDeadlineTimer);
+  iceDisconnectTimer = null;
+  iceRestartTimer = null;
+  iceRecoveryDeadlineTimer = null;
+}
+
+function peerIsConnected() {
+  if (!pc) return false;
+  return pc.connectionState === 'connected'
+    || pc.iceConnectionState === 'connected'
+    || pc.iceConnectionState === 'completed';
+}
+
+function finishIceRecovery() {
+  clearIceRecoveryTimers();
+  iceRestartInFlight = false;
+  iceRestartCount = 0;
+  if (callState === 'reconnecting') {
+    callState = 'talking';
+    showCallUI('talking', peerName);
+  }
+}
+
+function beginIceRecovery(immediate = false) {
+  if (!pc || !['talking', 'reconnecting'].includes(callState)) return;
+  if (peerIsConnected()) return finishIceRecovery();
+
+  if (callState !== 'reconnecting') {
+    callState = 'reconnecting';
+    showCallUI('reconnecting', peerName);
+  }
+
+  // 对端也可能同时收到 disconnected。仅由最初拨号方发起 ICE restart，避免 offer 冲突。
+  if (!iceRecoveryDeadlineTimer) {
+    iceRecoveryDeadlineTimer = setTimeout(() => {
+      if (callState === 'reconnecting') endCall(t('reconnectFailed'));
+    }, ICE_RECOVERY_DEADLINE_MS);
+  }
+  if (!callInitiator || iceRestartInFlight || iceRestartTimer) return;
+
+  if (immediate) {
+    clearTimeout(iceDisconnectTimer);
+    iceDisconnectTimer = null;
+    restartIce();
+  } else if (!iceDisconnectTimer) {
+    // disconnected 常由瞬时网络切换触发，先给浏览器一个自行恢复窗口。
+    iceDisconnectTimer = setTimeout(() => {
+      iceDisconnectTimer = null;
+      restartIce();
+    }, ICE_DISCONNECT_GRACE_MS);
+  }
+}
+
 async function createPeer() {
-  // 只用基础 ICE 配置, 兼容所有浏览器
-  pc = new RTCPeerConnection({ iceServers });
+  pc = new RTCPeerConnection({
+    iceServers,
+    iceTransportPolicy: 'all',
+    iceCandidatePoolSize: 4,
+    bundlePolicy: 'max-bundle',
+    rtcpMuxPolicy: 'require',
+  });
   pc.onicecandidate = (e) => {
     // 包含 null 候选 (end-of-candidates), 让对端知道可以提前协商 media
     send({ type: 'signal', signal: { type: 'ice', ice: e.candidate } });
@@ -620,35 +698,50 @@ async function createPeer() {
   };
   pc.oniceconnectionstatechange = () => {
     const s = pc && pc.iceConnectionState;
-    if (s === 'failed' || s === 'disconnected') {
-      // ICE 失败时尝试 ICE restart (最多 1 次)
-      if (iceRestartCount < 1 && callState === 'talking') {
-        iceRestartCount++;
-        showCallUI('reconnecting', peerName);
-        restartIce();
-      } else if (s === 'failed') {
-        endCall(t('callInterrupted'));
-      }
-    } else if (s === 'connected' || s === 'completed') {
-      iceRestartCount = 0; // 重置重试计数
-      if (callState === 'reconnecting') showCallUI('talking', peerName);
-    }
+    if (s === 'failed') beginIceRecovery(true);
+    else if (s === 'disconnected') beginIceRecovery(false);
+    else if (s === 'connected' || s === 'completed') finishIceRecovery();
   };
   pc.onconnectionstatechange = () => {
-    if (pc && ['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
-      endCall(t('callInterrupted'));
-    }
+    const s = pc && pc.connectionState;
+    if (s === 'failed') beginIceRecovery(true);
+    else if (s === 'disconnected') beginIceRecovery(false);
+    else if (s === 'connected') finishIceRecovery();
   };
   return pc;
 }
 
 async function restartIce() {
+  if (!pc || !callInitiator || callState !== 'reconnecting' || peerIsConnected()) {
+    if (peerIsConnected()) finishIceRecovery();
+    return;
+  }
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    // 信令通道恢复后再协商，不生成一个注定丢失的 offer。
+    iceRestartTimer = setTimeout(() => { iceRestartTimer = null; restartIce(); }, 1000);
+    return;
+  }
+  if (iceRestartInFlight) return;
+  if (iceRestartCount >= MAX_ICE_RESTARTS) {
+    endCall(t('reconnectFailed'));
+    return;
+  }
+
+  iceRestartInFlight = true;
+  iceRestartCount++;
   try {
+    if (typeof pc.restartIce === 'function') pc.restartIce();
     const offer = await pc.createOffer({ iceRestart: true });
     await pc.setLocalDescription(offer);
-    send({ type: 'signal', signal: { type: 'offer', sdp: pc.localDescription, restart: true } });
+    if (!send({ type: 'signal', signal: { type: 'offer', sdp: pc.localDescription, restart: true } })) {
+      throw new Error('signaling unavailable');
+    }
+    iceRestartTimer = setTimeout(() => { iceRestartTimer = null; restartIce(); }, ICE_RESTART_TIMEOUT_MS);
   } catch (e) {
-    endCall(t('reconnectFailed'));
+    if (iceRestartCount >= MAX_ICE_RESTARTS) endCall(t('reconnectFailed'));
+    else iceRestartTimer = setTimeout(() => { iceRestartTimer = null; restartIce(); }, 1500);
+  } finally {
+    iceRestartInFlight = false;
   }
 }
 
@@ -702,6 +795,8 @@ async function startCall() {
     return toast(t('microphoneDenied'));
   }
   callState = 'calling';
+  callInitiator = true;
+  clearIceRecoveryTimers();
   iceRestartCount = 0;
   callStartTime = 0; // 新通话从 0 开始计时
   pc = await createPeer();
@@ -721,6 +816,7 @@ async function handleCall(from, action) {
       return;
     }
     callState = 'ringing';
+    callInitiator = false;
     pendingOffer = null;
     peerName = from;
     $('peerName').textContent = from;
@@ -761,10 +857,12 @@ function showCallUI(mode, name) {
 }
 
 function tickCallTimer() {
-  if (callState !== 'talking') return;
-  const sec = Math.floor((Date.now() - callStartTime) / 1000);
-  const time = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
-  $('callStatus').textContent = t('duration', { time });
+  if (!['talking', 'reconnecting'].includes(callState)) { callTimerRaf = null; return; }
+  if (callState === 'talking') {
+    const sec = Math.floor((Date.now() - callStartTime) / 1000);
+    const time = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    $('callStatus').textContent = t('duration', { time });
+  }
   callTimerRaf = requestAnimationFrame(tickCallTimer);
 }
 
@@ -773,6 +871,10 @@ function endCall(reason) {
   // 通知对方挂断(ICE 断开等场景之前漏发, 对方会卡在通话 UI)
   send({ type: 'call', action: 'hangup' });
   callState = 'idle';
+  callInitiator = false;
+  clearIceRecoveryTimers();
+  iceRestartInFlight = false;
+  iceRestartCount = 0;
   callStartTime = 0; // 挂断后重置, 下次通话从 0 开始
   if (callTimerRaf) cancelAnimationFrame(callTimerRaf);
   callTimerRaf = null;
@@ -796,6 +898,8 @@ async function acceptCall() {
     return toast(t('microphoneDenied'));
   }
   callState = 'talking';
+  callInitiator = false;
+  clearIceRecoveryTimers();
   iceRestartCount = 0;
   callStartTime = 0; // 新通话从 0 开始计时
   pc = await createPeer();
@@ -824,11 +928,11 @@ async function handleSignal(from, signal) {
       // ICE restart: 对方重连, 我们生成 answer
       if (pc && (callState === 'talking' || callState === 'reconnecting')) {
         try {
+          beginIceRecovery(false);
           await pc.setRemoteDescription(signal.sdp);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           send({ type: 'signal', signal: { type: 'answer', sdp: pc.localDescription } });
-          showCallUI('reconnecting', peerName);
           toast(t('statusReconnecting'));
         } catch (e) {
           endCall(t('reconnectFailed'));
