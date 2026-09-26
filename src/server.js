@@ -197,9 +197,9 @@ const validRoom = (r) => typeof r === 'string' && /^[\p{L}\p{N}_-]{1,32}$/u.test
 const hashPass = (pw, roomId) => createHash('sha256').update(pw + '@' + roomId).digest('hex');
 
 wss.on('connection', (ws) => {
-  ws.isAlive = true;
+  ws.missedPongs = 0;
   clients.set(ws, {});
-  ws.on('pong', () => { ws.isAlive = true; });
+  ws.on('pong', () => { ws.missedPongs = 0; });
 
   ws.on('message', (raw) => {
     let msg;
@@ -367,8 +367,9 @@ function handle(ws, msg) {
 // 心跳
 const heartbeat = setInterval(() => {
   for (const ws of wss.clients) {
-    if (ws.isAlive === false) { ws.terminate(); continue; }
-    ws.isAlive = false;
+    // 手机熄屏时浏览器可能暂停 JS/网络；连续四次无响应再清理旧连接。
+    if (ws.missedPongs >= 4) { ws.terminate(); continue; }
+    ws.missedPongs++;
     try { ws.ping(); } catch {}
   }
 }, 30000);

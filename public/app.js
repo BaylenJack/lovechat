@@ -43,6 +43,9 @@ const I18N = {
     invalidMessage: 'Invalid message format', serverProcessingError: 'The server could not process the request',
     invalidParams: 'Invalid parameters', notInRoom: 'You have not joined a room', invalidFileUrl: 'Invalid file address',
     serverFileTooLarge: 'The file is too large', unknownCommand: 'Unknown command',
+    emptyTitle: 'A quieter place for two.', emptySubtitle: 'Say hello, or begin with a call.',
+    minimizeCall: 'Minimize call', expandCall: 'Expand call', muteCall: 'Mute microphone',
+    unmuteCall: 'Turn microphone on', hangupCall: 'Hang up', answerCall: 'Answer', declineCall: 'Decline',
   },
   zh: {
     pageTitle: 'lovechat — 两个人的私密空间', brandSub: '两个人的私密空间',
@@ -76,6 +79,9 @@ const I18N = {
     invalidMessage: '消息格式无效', serverProcessingError: '服务器处理请求时发生错误',
     invalidParams: '参数无效', notInRoom: '你尚未加入房间', invalidFileUrl: '文件地址无效',
     serverFileTooLarge: '文件过大', unknownCommand: '未知指令',
+    emptyTitle: '留一个只属于你们的角落。', emptySubtitle: '发条消息，或直接打个电话。',
+    minimizeCall: '缩小通话', expandCall: '展开通话', muteCall: '关闭麦克风',
+    unmuteCall: '打开麦克风', hangupCall: '挂断', answerCall: '接听', declineCall: '拒绝',
   },
   vi: {
     pageTitle: 'lovechat — Không gian của hai người', brandSub: 'Không gian riêng dành cho hai người',
@@ -112,6 +118,9 @@ const I18N = {
     invalidMessage: 'Định dạng tin nhắn không hợp lệ', serverProcessingError: 'Máy chủ gặp lỗi khi xử lý',
     invalidParams: 'Tham số không hợp lệ', notInRoom: 'Bạn chưa tham gia phòng',
     invalidFileUrl: 'Địa chỉ tệp không hợp lệ', serverFileTooLarge: 'Tệp quá lớn', unknownCommand: 'Lệnh không xác định',
+    emptyTitle: 'Một góc yên bình cho hai người.', emptySubtitle: 'Nhắn một lời chào, hoặc bắt đầu cuộc gọi.',
+    minimizeCall: 'Thu nhỏ cuộc gọi', expandCall: 'Mở rộng cuộc gọi', muteCall: 'Tắt micro',
+    unmuteCall: 'Bật micro', hangupCall: 'Kết thúc', answerCall: 'Trả lời', declineCall: 'Từ chối',
   },
 };
 
@@ -136,6 +145,7 @@ function applyLanguage(language, persist = true) {
   document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
   document.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-aria-label]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel)); });
   document.querySelectorAll('.language-option').forEach((el) => el.classList.toggle('active', el.dataset.language === language));
   if ($('languageSelect')) $('languageSelect').value = language;
 
@@ -148,6 +158,7 @@ function applyLanguage(language, persist = true) {
   if ($('callOverlay') && !$('callOverlay').classList.contains('hidden') && callState !== 'idle') {
     showCallUI(callState, peerName);
   }
+  updateMuteButton();
 }
 
 document.querySelectorAll('.language-option').forEach((button) => {
@@ -180,6 +191,8 @@ let momentImages = []; // 发布框待发图片 url
 let reconnectAttempt = 0;
 let reconnectTimer = null;
 let manualClose = false;
+let wsProbeTimer = null;
+let wsReconnectDuringCall = false;
 
 // 通话状态
 let callState = 'idle'; // idle | calling | ringing | talking | reconnecting
@@ -199,6 +212,8 @@ let iceRestartInFlight = false;
 let iceDisconnectTimer = null;
 let iceRestartTimer = null;
 let iceRecoveryDeadlineTimer = null;
+let callMinimized = false;
+let microphoneMuted = false;
 
 // 录音状态
 let mediaRecorder = null;
@@ -245,11 +260,19 @@ function connect() {
 
   ws.onmessage = (ev) => {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.type === 'pong') {
+      clearTimeout(wsProbeTimer);
+      wsProbeTimer = null;
+      return;
+    }
     handle(m);
   };
 
   ws.onclose = () => {
+    clearTimeout(wsProbeTimer);
+    wsProbeTimer = null;
     if (manualClose) return;
+    if (['talking', 'reconnecting'].includes(callState)) wsReconnectDuringCall = true;
     setStatus('statusReconnecting');
     scheduleReconnect();
   };
@@ -261,6 +284,23 @@ function scheduleReconnect() {
   const delay = Math.min(600 * Math.pow(1.6, reconnectAttempt - 1), 8000);
   clearTimeout(reconnectTimer);
   reconnectTimer = setTimeout(connect, delay);
+}
+
+function probeSignaling() {
+  if (!roomId) return;
+  if (!ws || ws.readyState === WebSocket.CLOSED) {
+    reconnectAttempt = 0;
+    connect();
+    return;
+  }
+  if (ws.readyState !== WebSocket.OPEN) return;
+  clearTimeout(wsProbeTimer);
+  if (!send({ type: 'ping' })) return;
+  const probedSocket = ws;
+  wsProbeTimer = setTimeout(() => {
+    wsProbeTimer = null;
+    if (ws === probedSocket && ws.readyState === WebSocket.OPEN) ws.close();
+  }, 6000);
 }
 
 function send(obj) {
@@ -297,23 +337,37 @@ function handle(m) {
       avatars = m.avatars || {};
       moments = m.moments || [];
       appendHistory(m.history || []);
-      if (m.name) peerName = m.name;
       $('peerName').textContent = peerName;
       updatePeerAvatar();
       setStatus('statusOnline');
+      if (wsReconnectDuringCall && callInitiator && ['talking', 'reconnecting'].includes(callState)) {
+        beginIceRecovery(true, true);
+      }
+      wsReconnectDuringCall = false;
       break;
 
     case 'message':
       renderMessage(m.message);
+      updateEmptyState();
       scrollToBottom();
       break;
 
     case 'presence': {
       const hadOnline = online.length > 0;
+      const partnerWasAway = hadOnline && online.length < 2;
       online = m.online || [];
+      const partner = online.find((name) => name !== myName);
+      if (partner) {
+        peerName = partner;
+        $('peerName').textContent = partner;
+        updatePeerAvatar();
+      }
       const meOnline = online.includes(myName);
       setStatus(meOnline && online.length >= 2 ? 'statusOnline' : 'statusOffline');
       if (hadOnline && online.length < 2) toast(t('partnerOffline'));
+      if (partnerWasAway && online.length >= 2 && callInitiator && ['talking', 'reconnecting'].includes(callState)) {
+        beginIceRecovery(true, true);
+      }
       break;
     }
 
@@ -378,7 +432,13 @@ function appendHistory(msgs) {
   const frag = document.createDocumentFragment();
   for (const m of msgs) renderMessage(m, true, frag);
   $('msgList').appendChild(frag);
+  updateEmptyState();
   scrollToBottom();
+}
+
+const renderedMessageIds = new Set();
+function updateEmptyState() {
+  $('emptyState').classList.toggle('hidden', !!$('msgList').querySelector('.msg'));
 }
 
 function avatarOf(name) {
@@ -434,6 +494,8 @@ function updatePeerAvatar() {
 }
 
 function renderMessage(m, isHistory = false, container = null) {
+  if (m.id && renderedMessageIds.has(m.id)) return;
+  if (m.id) renderedMessageIds.add(m.id);
   const mine = m.from === myName;
   const parent = container || $('msgList');
   const row = document.createElement('div');
@@ -637,8 +699,7 @@ function clearIceRecoveryTimers() {
 function peerIsConnected() {
   if (!pc) return false;
   return pc.connectionState === 'connected'
-    || pc.iceConnectionState === 'connected'
-    || pc.iceConnectionState === 'completed';
+    && (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed');
 }
 
 function finishIceRecovery() {
@@ -651,9 +712,9 @@ function finishIceRecovery() {
   }
 }
 
-function beginIceRecovery(immediate = false) {
+function beginIceRecovery(immediate = false, force = false) {
   if (!pc || !['talking', 'reconnecting'].includes(callState)) return;
-  if (peerIsConnected()) return finishIceRecovery();
+  if (!force && peerIsConnected()) return finishIceRecovery();
 
   if (callState !== 'reconnecting') {
     callState = 'reconnecting';
@@ -663,7 +724,13 @@ function beginIceRecovery(immediate = false) {
   // 对端也可能同时收到 disconnected。仅由最初拨号方发起 ICE restart，避免 offer 冲突。
   if (!iceRecoveryDeadlineTimer) {
     iceRecoveryDeadlineTimer = setTimeout(() => {
-      if (callState === 'reconnecting') endCall(t('reconnectFailed'));
+      iceRecoveryDeadlineTimer = null;
+      if (callState !== 'reconnecting') return;
+      if (document.visibilityState === 'hidden') {
+        beginIceRecovery(true, true);
+        return;
+      }
+      endCall(t('reconnectFailed'));
     }, ICE_RECOVERY_DEADLINE_MS);
   }
   if (!callInitiator || iceRestartInFlight || iceRestartTimer) return;
@@ -671,7 +738,7 @@ function beginIceRecovery(immediate = false) {
   if (immediate) {
     clearTimeout(iceDisconnectTimer);
     iceDisconnectTimer = null;
-    restartIce();
+    restartIce(force);
   } else if (!iceDisconnectTimer) {
     // disconnected 常由瞬时网络切换触发，先给浏览器一个自行恢复窗口。
     iceDisconnectTimer = setTimeout(() => {
@@ -711,14 +778,14 @@ async function createPeer() {
   return pc;
 }
 
-async function restartIce() {
-  if (!pc || !callInitiator || callState !== 'reconnecting' || peerIsConnected()) {
-    if (peerIsConnected()) finishIceRecovery();
+async function restartIce(force = false) {
+  if (!pc || !callInitiator || callState !== 'reconnecting' || (!force && peerIsConnected())) {
+    if (!force && peerIsConnected()) finishIceRecovery();
     return;
   }
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     // 信令通道恢复后再协商，不生成一个注定丢失的 offer。
-    iceRestartTimer = setTimeout(() => { iceRestartTimer = null; restartIce(); }, 1000);
+    iceRestartTimer = setTimeout(() => { iceRestartTimer = null; restartIce(force); }, 1000);
     return;
   }
   if (iceRestartInFlight) return;
@@ -758,6 +825,8 @@ function ensureAudioContext() {
 function unlockAudio() {
   if (!remoteAudio) {
     remoteAudio = new Audio();
+    remoteAudio.autoplay = true;
+    remoteAudio.playsInline = true;
     remoteAudio.style.display = 'none';
     document.body.appendChild(remoteAudio);
   }
@@ -766,11 +835,15 @@ function unlockAudio() {
 }
 // play() 失败兜底: 下次任意点击再试一次(移动端常见)
 function tryPlay(audio) {
-  audio.play().then(() => {
+  Promise.resolve(audio.play()).then(() => {
     audio.muted = false;
     if (audio.srcObject) audio.play().catch(() => {});
   }).catch(() => {
-    const retry = () => { try { audio.play(); } catch {} };
+    const retry = () => {
+      document.removeEventListener('click', retry);
+      document.removeEventListener('touchstart', retry);
+      tryPlay(audio);
+    };
     document.addEventListener('click', retry, { once: true });
     document.addEventListener('touchstart', retry, { once: true });
   });
@@ -785,6 +858,36 @@ function playRemoteAudio(stream) {
   tryPlay(remoteAudio);
 }
 
+function setCallMediaSession(active) {
+  if (!('mediaSession' in navigator)) return;
+  try {
+    navigator.mediaSession.playbackState = active ? 'playing' : 'none';
+    navigator.mediaSession.metadata = active
+      ? new MediaMetadata({ title: peerName, artist: t('voiceCall'), album: 'lovechat' }) : null;
+    navigator.mediaSession.setActionHandler('hangup', active ? () => endCall() : null);
+  } catch { /* Media Session varies by browser; WebRTC must keep working without it. */ }
+}
+
+function updateMuteButton() {
+  const button = $('callMute');
+  if (!button) return;
+  const key = microphoneMuted ? 'unmuteCall' : 'muteCall';
+  button.title = t(key);
+  button.setAttribute('aria-label', t(key));
+  button.setAttribute('aria-pressed', String(microphoneMuted));
+  button.classList.toggle('is-muted', microphoneMuted);
+  button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-3 0h6"/>'
+    + (microphoneMuted ? '<path d="M3 21 21 3"/>' : '') + '</svg>';
+}
+
+function setCallMinimized(minimized) {
+  if (callState === 'idle') return;
+  callMinimized = minimized;
+  $('callOverlay').classList.toggle('is-minimized', minimized);
+  $('callMinimize').classList.toggle('hidden', minimized);
+  $('callExpand').classList.toggle('hidden', !minimized);
+}
+
 async function startCall() {
   if (callState !== 'idle') return;
   try {
@@ -795,6 +898,8 @@ async function startCall() {
     return toast(t('microphoneDenied'));
   }
   callState = 'calling';
+  microphoneMuted = false;
+  updateMuteButton();
   callInitiator = true;
   clearIceRecoveryTimers();
   iceRestartCount = 0;
@@ -806,6 +911,7 @@ async function startCall() {
   send({ type: 'call', action: 'invite' });
   send({ type: 'signal', signal: { type: 'offer', sdp: pc.localDescription } });
   showCallUI('calling', peerName);
+  setCallMediaSession(true);
 }
 
 async function handleCall(from, action) {
@@ -840,6 +946,10 @@ async function handleCall(from, action) {
 
 function showCallUI(mode, name) {
   $('callOverlay').classList.remove('hidden');
+  $('callOverlay').classList.toggle('is-minimized', callMinimized);
+  $('callMinimize').classList.toggle('hidden', callMinimized);
+  $('callExpand').classList.toggle('hidden', !callMinimized);
+  $('callOverlay').querySelector('.call-card').classList.toggle('talking', mode === 'talking');
   $('callTitle').textContent = mode === 'talking' || mode === 'reconnecting' ? t('callWith', { name }) : name;
   $('callStatus').textContent =
     mode === 'calling' ? t('waitingAnswer') :
@@ -849,6 +959,8 @@ function showCallUI(mode, name) {
   $('callReject').classList.toggle('hidden', mode === 'talking' || mode === 'reconnecting');
   $('callAccept').classList.toggle('hidden', mode !== 'ringing');
   $('callHangup').classList.toggle('hidden', mode === 'ringing' || mode === 'idle');
+  $('callMute').classList.toggle('hidden', mode === 'ringing' || mode === 'idle');
+  updateMuteButton();
   $('callBtn').classList.remove('ringing');
   if (mode === 'talking' || mode === 'reconnecting') {
     callStartTime = callStartTime || Date.now();
@@ -871,6 +983,10 @@ function endCall(reason) {
   // 通知对方挂断(ICE 断开等场景之前漏发, 对方会卡在通话 UI)
   send({ type: 'call', action: 'hangup' });
   callState = 'idle';
+  callMinimized = false;
+  microphoneMuted = false;
+  wsReconnectDuringCall = false;
+  setCallMediaSession(false);
   callInitiator = false;
   clearIceRecoveryTimers();
   iceRestartInFlight = false;
@@ -880,9 +996,10 @@ function endCall(reason) {
   callTimerRaf = null;
   if (pc) { pc.close(); pc = null; }
   if (localStream) { localStream.getTracks().forEach((t) => t.stop()); localStream = null; }
-  if (remoteAudio) { remoteAudio.srcObject = null; remoteAudio = null; }
+  if (remoteAudio) { remoteAudio.pause(); remoteAudio.srcObject = null; remoteAudio.remove(); remoteAudio = null; }
   if (pendingIce) pendingIce.length = 0; // 清空旧候选, 避免泄漏到下次通话
   $('callOverlay').classList.add('hidden');
+  $('callOverlay').classList.remove('is-minimized');
   $('callBtn').classList.remove('ringing');
   if (reason) toast(reason);
 }
@@ -898,6 +1015,8 @@ async function acceptCall() {
     return toast(t('microphoneDenied'));
   }
   callState = 'talking';
+  microphoneMuted = false;
+  updateMuteButton();
   callInitiator = false;
   clearIceRecoveryTimers();
   iceRestartCount = 0;
@@ -919,6 +1038,7 @@ async function acceptCall() {
   send({ type: 'signal', signal: { type: 'answer', sdp: pc.localDescription } });
   send({ type: 'call', action: 'accept' });
   showCallUI('talking', peerName);
+  setCallMediaSession(true);
 }
 
 async function handleSignal(from, signal) {
@@ -952,6 +1072,7 @@ async function handleSignal(from, signal) {
       // 补放暂存的 ICE 候选(响铃/呼叫阶段收到但 pc 未就绪)
       for (const c of pendingIce) { try { await pc.addIceCandidate(c); } catch {} }
       pendingIce = [];
+      if (callState === 'reconnecting' && peerIsConnected()) finishIceRecovery();
     }
   } else if (signal.type === 'ice') {
     if (signal.ice === undefined) return;
@@ -1168,10 +1289,10 @@ $('recordingOverlay').addEventListener('touchend', (e) => {
 $('callBtn').onclick = () => {
   unlockAudio(); // 用户手势解锁音频(移动端必须)
   if (callState === 'idle') startCall();
+  else setCallMinimized(false);
 };
 $('callAccept').onclick = () => {
   unlockAudio(); // 用户手势解锁音频(移动端必须)
-  $('callOverlay').classList.add('hidden');
   acceptCall();
 };
 $('callReject').onclick = () => {
@@ -1179,6 +1300,14 @@ $('callReject').onclick = () => {
   endCall(t('rejected'));
 };
 $('callHangup').onclick = () => endCall();
+$('callMinimize').onclick = () => setCallMinimized(true);
+$('callExpand').onclick = () => setCallMinimized(false);
+$('callMute').onclick = () => {
+  if (!localStream) return;
+  microphoneMuted = !microphoneMuted;
+  localStream.getAudioTracks().forEach((track) => { track.enabled = !microphoneMuted; });
+  updateMuteButton();
+};
 
 // 返回
 $('backBtn').onclick = () => {
@@ -1556,6 +1685,15 @@ applyLanguage(currentLanguage, false);
 // 断线自动重连 + 后台恢复
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && roomId) {
-    if (!ws || ws.readyState === WebSocket.CLOSED) { reconnectAttempt = 0; connect(); }
+    probeSignaling();
+    if (['talking', 'reconnecting'].includes(callState) && pc && !peerIsConnected()) {
+      beginIceRecovery(true);
+    }
   }
+});
+window.addEventListener('pageshow', () => {
+  if (roomId && document.visibilityState === 'visible') probeSignaling();
+});
+window.addEventListener('online', () => {
+  if (roomId && document.visibilityState === 'visible') probeSignaling();
 });

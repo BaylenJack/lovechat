@@ -1343,3 +1343,177 @@ body::before {
   0%, 100% { height: 5px; }
   50% { height: 15px; }
 }
+
+/* v5: understated forest-and-copper palette, calmer surfaces and a compact call window. */
+:root {
+  --bg-base: #102321;
+  --bg-1: #132b28;
+  --bg-2: #1e3833;
+  --accent-purple: #d99b79;
+  --accent-pink: #e9b391;
+  --accent-indigo: #8abfaf;
+  --accent-blush: #f0c5a8;
+  --text-strong: #faf6ef;
+  --text-primary: #f2eee7;
+  --text-secondary: #b7c5bd;
+  --text-tertiary: #849a91;
+  --text-faint: #536d63;
+  --surface: rgba(243, 245, 232, .055);
+  --surface-hover: rgba(243, 245, 232, .09);
+  --surface-strong: rgba(243, 245, 232, .13);
+  --surface-glass: rgba(25, 47, 43, .93);
+  --divider: rgba(235, 241, 225, .09);
+  --border-subtle: rgba(235, 241, 225, .1);
+  --border-default: rgba(235, 241, 225, .17);
+  --border-strong: rgba(235, 241, 225, .26);
+  --border-accent: rgba(222, 162, 127, .55);
+  --grad-primary: linear-gradient(135deg, #b97659, #d99b79);
+  --grad-mine: linear-gradient(145deg, #b16f55, #c98a69);
+  --grad-mine-deep: linear-gradient(145deg, #a55f49, #bd795c);
+  --grad-brand: linear-gradient(120deg, #faf1e4 15%, #e6ba9a 75%);
+  --grad-bg: radial-gradient(ellipse 85% 65% at 8% 8%, rgba(87, 136, 113, .18), transparent 68%),
+             radial-gradient(ellipse 80% 70% at 100% 100%, rgba(178, 103, 74, .13), transparent 72%),
+             linear-gradient(160deg, #102321, #152e2a 54%, #1d342e);
+  --shadow-glow: 0 8px 28px rgba(102, 48, 33, .22);
+  --shadow-glow-strong: 0 12px 32px rgba(102, 48, 33, .32);
+  --shadow-mine: 0 8px 24px rgba(62, 30, 23, .22);
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 26px;
+}
+
+body::before { display: none; }
+body { background: var(--grad-bg); }
+.lobby-card {
+  max-width: 410px;
+  padding: 38px 32px 30px;
+  background: linear-gradient(150deg, rgba(36, 62, 55, .97), rgba(20, 40, 36, .97));
+  border: 1px solid rgba(230, 219, 198, .18);
+  box-shadow: 0 28px 80px rgba(2, 17, 15, .34);
+}
+.brand-name { filter: none; font-size: 51px; }
+.brand-sub { letter-spacing: 1.1px; text-transform: none; }
+.language-option.active { background: #d49a78; color: #241e18; box-shadow: none; }
+.field-input, .text-input { background: rgba(7, 24, 21, .38); box-shadow: none; }
+.field-input:focus, .text-input:focus {
+  background: rgba(7, 24, 21, .48);
+  border-color: #d9a382;
+  box-shadow: 0 0 0 3px rgba(217, 163, 130, .17);
+}
+.btn-primary, .send-btn { color: #231d18; box-shadow: 0 10px 26px rgba(66, 30, 21, .2); }
+.app { max-width: 780px; background: rgba(9, 29, 25, .22); border-inline: 1px solid rgba(242, 240, 222, .055); }
+.msg-list { position: relative; }
+.topbar, .inputbar { background: rgba(20, 42, 37, .96); backdrop-filter: blur(18px); }
+.topbar { border-bottom-color: rgba(231, 226, 204, .12); }
+.peer-avatar, .msg.mine .avatar, .avatar-preview { background: #c48a69; box-shadow: none; }
+.msg .avatar { background: #668b7c; box-shadow: none; }
+.peer-status.online, .moment-like.on { color: #a5d4ba; }
+.peer-status.online::before { background: #a5d4ba; box-shadow: none; animation: none; }
+.icon-btn.primary { color: #261e19; box-shadow: none; }
+.icon-btn svg, .input-btn svg, .call-mute svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-btn.primary svg { stroke-width: 1.9; }
+.input-btn svg { width: 18px; height: 18px; }
+.chat-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(320px, calc(100% - 40px));
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+.chat-empty-mark { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 26px; }
+.chat-empty-mark span { width: 45px; height: 45px; border-radius: 50%; border: 1px solid rgba(227, 186, 154, .46); background: rgba(227, 186, 154, .095); }
+.chat-empty-mark span:last-child { width: 37px; height: 37px; border-color: rgba(149, 194, 163, .48); background: rgba(149, 194, 163, .09); }
+.chat-empty-mark i { width: 35px; height: 1px; background: linear-gradient(90deg, #d5a385, #9fc2a9); }
+.chat-empty-title { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 28px; line-height: 1.2; color: #f5ebdf; }
+.chat-empty-sub { margin-top: 11px; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.msg .bubble::before, .msg .bubble::after { display: none; }
+.msg.mine .bubble { box-shadow: 0 5px 15px rgba(0, 0, 0, .15); }
+.msg.peer .bubble { background: rgba(216, 233, 214, .085); border-color: rgba(216, 233, 214, .13); box-shadow: none; }
+.msg-list.bg-custom { background-image: linear-gradient(rgba(15, 34, 29, .75), rgba(15, 34, 29, .88)), var(--bg-url); }
+.input-btn { box-shadow: none; }
+.emoji-panel { background: #1a332e; }
+.call-overlay { background: rgba(5, 21, 18, .72); backdrop-filter: blur(14px); }
+.call-card, .crop-card { background: #203a33; border: 1px solid rgba(242, 233, 212, .16); box-shadow: 0 24px 70px rgba(1, 13, 11, .44); }
+.settings-card { padding: 30px; }
+
+.call-overlay-voice { z-index: 55; }
+.call-card-voice {
+  width: min(390px, calc(100vw - 32px));
+  min-width: 0;
+  padding: 36px 28px 30px;
+  background: linear-gradient(155deg, #29443b, #19312b 75%);
+  border-radius: 28px;
+}
+.call-window-btn {
+  position: absolute;
+  top: 14px;
+  right: 15px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(245, 237, 217, .2);
+  border-radius: 12px;
+  color: var(--text-primary);
+  background: rgba(248, 241, 220, .08);
+  font: inherit;
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+}
+.call-window-btn:hover { background: rgba(248, 241, 220, .16); }
+.call-avatar { background: linear-gradient(145deg, #b8775d, #dfad89); box-shadow: 0 0 0 7px rgba(223, 173, 137, .1); animation: none; }
+.call-card.talking .call-avatar::after { display: none; }
+.call-eyebrow { margin-bottom: 6px; color: #dcb399; font-size: 11px; font-weight: 700; letter-spacing: 1.7px; text-transform: uppercase; }
+.call-title { font-size: 23px; letter-spacing: -.4px; }
+.call-status { margin-bottom: 28px; color: var(--text-secondary); letter-spacing: .2px; font-family: inherit; }
+.call-actions { gap: 12px; }
+.call-btn-round { width: 56px; height: 56px; font-size: 22px; box-shadow: none; }
+.call-btn-round::before { display: none; }
+.call-accept { background: #83b99f; color: #122b22; }
+.call-reject, .call-hangup { background: #ad6659; }
+.call-mute { background: rgba(235, 240, 220, .16); border: 1px solid rgba(235, 240, 220, .2); }
+.call-mute.is-muted { background: #d4a079; color: #211c17; }
+
+.call-overlay-voice.is-minimized {
+  inset: auto 18px calc(env(safe-area-inset-bottom) + 84px) auto;
+  display: block;
+  width: min(350px, calc(100vw - 36px));
+  background: none;
+  backdrop-filter: none;
+  pointer-events: none;
+  animation: none;
+}
+.is-minimized .call-card-voice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 20px;
+  text-align: left;
+  pointer-events: auto;
+  box-shadow: 0 18px 46px rgba(0, 12, 10, .48);
+}
+.is-minimized .call-avatar { width: 40px; height: 40px; flex: 0 0 40px; margin: 0; font-size: 17px; box-shadow: none; }
+.is-minimized .call-copy { min-width: 0; flex: 1; padding-right: 20px; }
+.is-minimized .call-eyebrow { display: none; }
+.is-minimized .call-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; margin: 0 0 2px; }
+.is-minimized .call-status { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; margin: 0; }
+.is-minimized .call-window-btn { top: 5px; right: 5px; width: 27px; height: 27px; border: 0; background: none; font-size: 19px; }
+.is-minimized .call-actions { gap: 5px; align-self: flex-end; }
+.is-minimized .call-btn-round { width: 34px; height: 34px; font-size: 16px; }
+.is-minimized .call-mute { display: none; }
+@media (max-width: 560px) {
+  .call-overlay-voice.is-minimized { right: 12px; bottom: calc(env(safe-area-inset-bottom) + 78px); }
+  .call-card-voice { padding: 36px 24px 28px; }
+  .is-minimized .call-card-voice { padding: 11px 12px; }
+}
